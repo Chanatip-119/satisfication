@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('checkin', function (Blueprint $table) {
             $table->id('checkin_id');
+            $table->foreignId('staff_id')->constrained('staff', 'staff_id');
             $table->foreignId('schedule_id')->constrained('schedule','schedule_id');
             $table->timestamp('checkin_at');
             $table->timestamp('checkout_at')->nullable();
