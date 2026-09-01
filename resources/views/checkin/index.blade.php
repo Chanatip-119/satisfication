@@ -19,7 +19,7 @@
     <div class="container">
         
         <div class="header">
-            <div class="logo"></div>
+            <div><img src="{{ asset('images/Buu-logo11.png') }}" alt="BUU Logo" style="width: 80px; height: auto; margin: 0 auto 16px; display: block; background-color: transparent;"></div>
             <h1 class="title">Staff Check-in</h1>
             <p class="subtitle">{{ $library_name }}</p>
         </div>
@@ -163,7 +163,7 @@
             <button class="modal-close" onclick="document.getElementById('checkoutModal').classList.remove('active')">✕</button>
             
             <div class="header" style="margin-top: 24px;">
-                <div class="logo"></div>
+                <div><img src="{{ asset('images/Buu-logo11.png') }}" alt="BUU Logo" style="width: 80px; height: auto; margin: 0 auto 16px; display: block; background-color: transparent;"></div>
                 <h1 class="title">Staff Check-in</h1>
                 <p class="subtitle">{{ $library_name }}</p>
             </div>
@@ -199,8 +199,8 @@
             <button class="modal-close" onclick="document.getElementById('reviewsModal').classList.remove('active')">✕</button>
             
             <div class="header" style="margin-top: 24px; margin-bottom: 16px;">
-                <div class="logo" style="width: 32px; height: 32px; margin-bottom: 8px;"></div>
-                <h1 class="title" style="font-size: 16px;">Staff Check-in Kiosk</h1>
+                <div><img src="{{ asset('images/Buu-logo11.png') }}" alt="BUU Logo" style="width: 48px; height: auto; margin: 0 auto 8px; display: block; background-color: transparent;"></div>
+                <h1 class="title" style="font-size: 16px;">Staff Check-in</h1>
                 <p class="subtitle" style="font-size: 12px;">{{ $library_name }}</p>
             </div>
 
@@ -230,11 +230,11 @@
             </div>
 
             <div class="filter-group">
-                <div class="filter-tag active">ทั้งหมด ({{ $review_stats->total }})</div>
+                <div class="filter-tag active" id="filter-all" onclick="filterReviews('all')">ทั้งหมด ({{ $review_stats->total }})</div>
                 @foreach($review_filters as $filter)
                 <div class="filter-tag">{{ $filter->name }} ({{ $filter->count }})</div>
                 @endforeach
-                <div class="filter-tag danger">เชิงลบ ({{ $review_stats->negative }})</div>
+                <div class="filter-tag danger" id="filter-negative" onclick="filterReviews('negative')">เชิงลบ ({{ $review_stats->negative }})</div>
             </div>
 
             <div class="review-header-flex">
@@ -244,7 +244,7 @@
 
             <div style="height: 300px; overflow-y: auto; padding-right: 4px;">
                 @foreach($reviews as $review)
-                <div class="review-card {{ $review->rating <= 3 ? 'negative' : '' }}">
+                <div class="review-card review-item {{ $review->rating <= 2 ? 'negative' : '' }}" data-rating="{{ $review->rating }}">
                     <div class="review-time">{{ $review->date }} - {{ $review->time }} น.</div>
                     <div class="review-text">{{ $review->comment ?? 'ไม่มีข้อเสนอแนะ' }}</div>
                     <div class="review-stars">
@@ -292,6 +292,37 @@
                 currentPin = currentPin.slice(0, -1);
                 updateDisplay();
             }
+        }
+    </script>
+    @endif
+
+    @if($step == 4)
+    <script>
+        function filterReviews(type) {
+            const items = document.querySelectorAll('.review-item');
+            const btnAll = document.getElementById('filter-all');
+            const btnNeg = document.getElementById('filter-negative');
+
+            if (type === 'all') {
+                btnAll.classList.add('active');
+                btnNeg.classList.remove('active');
+            } else {
+                btnNeg.classList.add('active');
+                btnAll.classList.remove('active');
+            }
+
+            items.forEach(item => {
+                const rating = parseInt(item.getAttribute('data-rating'));
+                if (type === 'all') {
+                    item.style.display = 'block';
+                } else if (type === 'negative') {
+                    if (rating <= 2) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                }
+            });
         }
     </script>
     @endif
