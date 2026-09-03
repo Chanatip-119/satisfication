@@ -21,7 +21,7 @@
         <a href="{{ route('report.staff') }}" class="menu-item {{ Route::is('report.staff') ? 'active' : '' }}">รายงาน Staff</a>
 
         <div class="menu-category">จัดการ</div>
-        <a href="#" class="menu-item">เคาน์เตอร์</a>
+        <a href="{{ route('counter.index') }}" class="menu-item {{ Route::is('counter.*') ? 'active' : '' }}">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item {{ Route::is('staff.index') ? 'active' : '' }}">บุคลากร</a>
         <a href="#" class="menu-item">QR Code</a>
 

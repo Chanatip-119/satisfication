@@ -25,14 +25,31 @@ class StaffController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'staff_id' => 'required|integer',
+            'staff_id' => 'required|string|max:255',
             'staff_name' => 'required|string|max:255',
             'staff_email' => 'required|string|max:255',
             'staff_pincode' => 'required|string|max:255',
             'role_id' => 'required|integer'
         ]);
 
-        Staff::create($request->all());
+        
+        $staffIdNum = (int) preg_replace('/[^0-9]/', '', $request->staff_id);
+
+        if ($staffIdNum <= 0) {
+            return redirect()->back()->withErrors(['staff_id' => 'รหัสพนักงานต้องมีตัวเลข']);
+        }
+
+        if (Staff::where('staff_id', $staffIdNum)->exists()) {
+            return redirect()->back()->withErrors(['staff_id' => 'รหัสพนักงาน ' . $staffIdNum . ' ถูกใช้แล้ว']);
+        }
+
+        $staff = new Staff();
+        $staff->staff_id = $staffIdNum;
+        $staff->staff_name = $request->staff_name;
+        $staff->staff_email = $request->staff_email;
+        $staff->staff_pincode = $request->staff_pincode;
+        $staff->role_id = $request->role_id;
+        $staff->save();
 
         return redirect()->route('staff.index')->with('success', 'เพิ่มข้อมูลบุคลากรสำเร็จ');
     }
@@ -86,7 +103,7 @@ class StaffController extends Controller
 
         return response()->json([
             'name' => $staff->staff_name,
-            'code' => 'BUU-' . str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT) . ' · ' . ($staff->role ? $staff->role->role_name : 'Staff'),
+            'code' => 'BUU-' . str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT),
             'pin' => $staff->staff_pincode,
             'avg_rating' => $avgRating,
             'total_checkins' => $checkins->count(),
@@ -99,5 +116,30 @@ class StaffController extends Controller
             'history' => $history,
             'comments' => $comments
         ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'role_id' => 'required|integer|in:1,2,3,4'
+        ]);
+
+        $staff = Staff::findOrFail($id);
+        $staff->role_id = $request->role_id;
+        $staff->save();
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'อัปเดตสิทธิ์สำเร็จ']);
+        }
+
+        return redirect()->route('staff.index')->with('success', 'อัปเดตสิทธิ์สำเร็จ');
+    }
+
+    public function destroy($id)
+    {
+        $staff = Staff::findOrFail($id);
+        $staff->delete();
+
+        return redirect()->route('staff.index')->with('success', 'ลบบุคลากรสำเร็จ');
     }
 }

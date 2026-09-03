@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>จัดการบุคลากร</title>
     <link rel="stylesheet" href="{{ asset('css/staff.css') }}?v={{ filemtime(public_path('css/staff.css')) }}">
 </head>
@@ -20,7 +21,7 @@
         <a href="{{ route('report.staff') }}" class="menu-item {{ Route::is('report.staff') ? 'active' : '' }}">รายงาน Staff</a>
 
         <div class="menu-category">จัดการ</div>
-        <a href="#" class="menu-item">เคาน์เตอร์</a>
+        <a href="{{ route('counter.index') }}" class="menu-item {{ Route::is('counter.*') ? 'active' : '' }}">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item {{ Route::is('staff.index') ? 'active' : '' }}">บุคลากร</a>
         <a href="#" class="menu-item">QR Code</a>
 
@@ -99,7 +100,7 @@
                         </td>
                         <td>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <select class="dropdown-box" style="padding: 5px 10px; font-size: 13px; height: 32px;">
+                                <select class="dropdown-box role-select" data-staff-id="{{ $staff->staff_id }}" style="padding: 5px 10px; font-size: 13px; height: 32px;">
                                     <option value="4" {{ $staff->role_id == 4 ? 'selected' : '' }}>Employee</option>
                                     <option value="3" {{ $staff->role_id == 3 ? 'selected' : '' }}>Admin</option>
                                     <option value="2" {{ $staff->role_id == 2 ? 'selected' : '' }}>SuperAdmin</option>
@@ -149,7 +150,6 @@
 
     </main>
 
-    <!-- Side Panel สำหรับแสดงรายละเอียด Staff -->
     <div id="staff-panel-overlay" class="side-panel-overlay" onclick="closeStaffPanel()"></div>
     <div id="staff-panel" class="side-panel">
         <div class="sp-header">
@@ -169,7 +169,6 @@
         </div>
 
         <div class="sp-content">
-            <!-- ภาพรวม -->
             <div id="sp-tab-overview" class="sp-section active">
                 <div class="sp-stats-grid">
                     <div class="sp-stat-box">
@@ -217,13 +216,11 @@
                 </div>
             </div>
 
-            <!-- ประวัติ Check-in -->
             <div id="sp-tab-history" class="sp-section">
                 <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">ประวัติ 7 วันล่าสุด</h4>
                 <div id="sp-history-container"></div>
             </div>
 
-            <!-- ความคิดเห็น -->
             <div id="sp-tab-comments" class="sp-section">
                 <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">ความคิดเห็นล่าสุด</h4>
                 <div id="sp-comments-container"></div>
@@ -231,7 +228,6 @@
         </div>
     </div>
 
-    <!-- Modal เพิ่มบุคลากร (อัปเดตตาม Figma) -->
     <div id="modal-add-staff" class="modal-overlay">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header-flex">
@@ -271,9 +267,7 @@
                         <label>PIN CODE ( 4 หลัก )</label>
                         <div class="input-with-icon">
                             <input type="text" name="staff_pincode" placeholder="● ● ● ●" required>
-                            <span class="input-icon-right" onclick="alert('สุ่ม PIN ใหม่')">
-                                
-                            </span>
+                            <span class="input-icon-right" onclick="alert('สุ่ม PIN ใหม่')"></span>
                         </div>
                     </div>
                 </div>
@@ -320,7 +314,6 @@
         </div>
     </div>
 
-    <!-- Modal Reset PIN -->
     <div id="modal-reset" class="modal-overlay">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
@@ -361,7 +354,6 @@
         </div>
     </div>
 
-    <!-- Modal Import -->
     <div id="modal-import" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -430,7 +422,13 @@
             document.getElementById('staff-panel').classList.add('open');
             
             document.getElementById('sp-name').innerText = "กำลังโหลดข้อมูล...";
-            
+            document.getElementById('sp-code').innerText = "BUU-...";
+            document.getElementById('sp-avg-rating').innerText = "-";
+            document.getElementById('sp-total-checkins').innerText = "-";
+            document.getElementById('sp-total-comments').innerText = "-";
+            document.getElementById('sp-current-counter').innerText = "-";
+            document.getElementById('sp-time-range').innerText = "-";
+
             fetch('/staff/' + staffId, {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
             })
@@ -438,22 +436,20 @@
             .then(data => {
                 document.getElementById('sp-name').innerText = data.name;
                 document.getElementById('sp-code').innerText = data.code;
+                document.getElementById('sp-pin').innerText = data.pin || '-';
                 document.getElementById('sp-avg-rating').innerText = data.avg_rating;
                 document.getElementById('sp-total-checkins').innerText = data.total_checkins;
                 document.getElementById('sp-total-comments').innerText = data.total_comments;
                 document.getElementById('sp-current-counter').innerText = data.current_counter;
                 document.getElementById('sp-time-range').innerText = data.time_range;
-                document.getElementById('sp-pin').innerText = data.pin;
                 
-                let statusHtml = data.status === 'Active' 
-                    ? '<div class="status-dot"></div> Active' 
-                    : '<div class="status-dot" style="background:#a0aec0;"></div> Offline';
+                let statusHtml = '<div class="status-dot"></div> ' + data.status;
                 document.getElementById('sp-status').innerHTML = statusHtml;
                 document.getElementById('sp-status').className = data.status === 'Active' ? 'status active' : 'status offline';
 
                 let progHtml = '';
                 for(let i=5; i>=1; i--) {
-                    let pct = Math.round((data.rating_counts[i] / data.total_evals) * 100) || 0;
+                    let pct = data.total_evals > 0 ? Math.round((data.rating_counts[i] / data.total_evals) * 100) : 0;
                     progHtml += `
                         <div class="sp-progress-row">
                             <span style="color:#ecc94b;">★</span>
@@ -465,37 +461,85 @@
                 }
                 document.getElementById('sp-progress-container').innerHTML = progHtml;
 
-                let histHtml = '';
-                if(data.history.length === 0) histHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีประวัติ Check-in</p>';
-                data.history.forEach(h => {
-                    histHtml += `
-                        <div class="sp-card">
-                            <div class="sp-card-header">
-                                <div class="sp-card-title">${h.date} — ${h.counter}</div>
-                                <div class="sp-card-right">${h.avg} (${h.count} ครั้ง)</div>
-                            </div>
-                            <div class="sp-card-desc">${h.time}</div>
-                        </div>`;
-                });
-                document.getElementById('sp-history-container').innerHTML = histHtml;
-
                 let cmtHtml = '';
-                if(data.comments.length === 0) cmtHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีความคิดเห็น</p>';
-                data.comments.forEach(c => {
-                    let stars = '★'.repeat(c.rating) + '☆'.repeat(5 - c.rating);
-                    cmtHtml += `
-                        <div class="sp-card">
-                            <div class="sp-card-header">
-                                <div class="sp-card-title" style="color:#3182ce;">${c.counter}</div>
-                                <div class="sp-card-date">${c.time}</div>
-                            </div>
-                            <div class="sp-card-desc" style="color:#1a202c; font-weight:500;">${c.text}</div>
-                            <div class="star-rating">${stars}</div>
-                        </div>`;
-                });
+                if(data.comments.length === 0) {
+                    cmtHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีความคิดเห็น</p>';
+                } else {
+                    data.comments.forEach(c => {
+                        let stars = '★'.repeat(c.rating) + '☆'.repeat(5 - c.rating);
+                        cmtHtml += `
+                            <div class="sp-card">
+                                <div class="sp-card-header">
+                                    <div class="sp-card-title" style="color:#3182ce;">${c.counter}</div>
+                                    <div class="sp-card-date">${c.time}</div>
+                                </div>
+                                <div class="sp-card-desc" style="color:#1a202c; font-weight:500;">${c.text}</div>
+                                <div class="star-rating">${stars}</div>
+                            </div>`;
+                    });
+                }
                 document.getElementById('sp-comments-container').innerHTML = cmtHtml;
+
+                let histHtml = '';
+                if(data.history.length === 0) {
+                    histHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีประวัติ Check-in</p>';
+                } else {
+                    data.history.forEach(h => {
+                        histHtml += `
+                            <div class="sp-card">
+                                <div class="sp-card-header">
+                                    <div class="sp-card-title">${h.date} — ${h.counter}</div>
+                                    <div class="sp-card-right">${h.avg} (${h.count} ครั้ง)</div>
+                                </div>
+                                <div class="sp-card-desc">${h.time}</div>
+                            </div>`;
+                    });
+                }
+                document.getElementById('sp-history-container').innerHTML = histHtml;
+            })
+            .catch(error => {
+                document.getElementById('sp-name').innerText = "เกิดข้อผิดพลาดในการดึงข้อมูล";
             });
         }
+
+        document.querySelectorAll('.role-select').forEach(function(select) {
+            select.addEventListener('change', function() {
+                const staffId = this.dataset.staffId;
+                const roleId = this.value;
+                const selectEl = this;
+                const originalValue = selectEl.dataset.originalValue || selectEl.querySelector('[selected]')?.value;
+
+                fetch('/staff/' + staffId, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ role_id: roleId })
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('Server error');
+                    return res.json();
+                })
+                .then(data => {
+                    const row = selectEl.closest('tr');
+                    const badge = row.querySelector('.badge');
+                    const roleNames = { '1': 'Executive', '2': 'SuperAdmin', '3': 'Admin', '4': 'Employee' };
+                    if (badge) badge.textContent = roleNames[roleId] || 'Staff';
+
+                    selectEl.style.borderColor = '#48bb78';
+                    setTimeout(() => { selectEl.style.borderColor = ''; }, 1500);
+                })
+                .catch(err => {
+                    alert('เกิดข้อผิดพลาดในการอัปเดตสิทธิ์: ' + err.message);
+                    if (originalValue) selectEl.value = originalValue;
+                });
+            });
+
+            select.dataset.originalValue = select.value;
+        });
     </script>
 </body>
 </html>

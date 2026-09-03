@@ -6,13 +6,19 @@ use App\Http\Controllers\CounterController;
 use App\Http\Controllers\CheckinController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ScheduleController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
 Route::resource('staff', StaffController::class);
+
 Route::resource('counter', CounterController::class);
+Route::post('/counter/{counterId}/sub', [CounterController::class, 'storeSub'])->name('counter.storeSub');
+Route::delete('/counter/{counterId}/sub/{subId}', [CounterController::class, 'destroySub'])->name('counter.destroySub');
+
+Route::resource('schedule', ScheduleController::class);
 
 Route::get('/checkin', [CheckinController::class, 'index'])->name('checkin.index');
 Route::post('/checkin/step1', [CheckinController::class, 'step1'])->name('checkin.step1');
