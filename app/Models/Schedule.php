@@ -12,6 +12,7 @@ class Schedule extends Model
 
     protected $fillable = [
         'schedule_id',
+        'staff_id', 
         'counter_sub_id',
         'schedule_date',
         'start_time',
@@ -27,6 +28,11 @@ class Schedule extends Model
     public function counterSub()
     {
         return $this->belongsTo(CounterSub::class, 'counter_sub_id', 'counter_sub_id');
+    }
+
+    public function staff()
+    {
+        return $this->belongsTo(Staff::class, 'staff_id', 'staff_id');
     }
 
     public function getRouteKeyName()

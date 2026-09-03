@@ -13,11 +13,10 @@ use Carbon\Carbon;
 
 class CheckinController extends Controller
 {
-    private $libraryName = 'สำนักหอสมุดมหาวิทยาลัยบูรพา';
+    private $libraryName = 'สำนักหอสมุด มหาวิทยาลัย';
 
     public function index(Request $request)
     {
-        // สแกน QR Code แล้วข้ามไปหน้ากรอก PIN
         if ($request->has('counter_id')) {
             return view('checkin.index', [
                 'step' => 2,
@@ -31,20 +30,29 @@ class CheckinController extends Controller
 
         foreach ($counters as $counter) {
             foreach ($counter->countersubs as $sub) {
-                $schedule = Schedule::where('counter_sub_id', $sub->counter_sub_id)
+                // ดึง Schedule ทั้งหมดของเคาน์เตอร์นี้ในวันนี้
+                $schedules = Schedule::where('counter_sub_id', $sub->counter_sub_id)
                     ->where('schedule_date', now()->toDateString())
-                    ->first();
+                    ->get();
 
-                if ($schedule) {
-                    $hasActiveCheckin = Checkin::where('schedule_id', $schedule->schedule_id)
+                $scheduleIds = $schedules->pluck('schedule_id');
+                $hasActiveCheckin = false;
+                
+                // เช็คว่าเคาน์เตอร์มีคนใช้อยู่ไหม โดยดูจากทุก Schedule ของเคาน์เตอร์นี้
+                if ($scheduleIds->isNotEmpty()) {
+                    $hasActiveCheckin = Checkin::whereIn('schedule_id', $scheduleIds)
                         ->whereNull('checkout_at')
                         ->exists();
+                }
 
+                $firstSchedule = $schedules->first();
+
+                if ($schedules->isNotEmpty() || true) { // เปลี่ยนเป็น true ถ้าอยากให้แสดงเคาน์เตอร์ตลอดแม้ไม่มี Schedule
                     $countersList->push((object)[
                         'id'           => $sub->counter_sub_id,
                         'name'         => 'เคาน์เตอร์ ' . $counter->counter_id . '.' . $sub->counter_sub_id,
-                        'time_start'   => substr($schedule->start_time, 0, 5),
-                        'time_end'     => substr($schedule->end_time, 0, 5),
+                        'time_start'   => $firstSchedule ? substr($firstSchedule->start_time, 0, 5) : '-',
+                        'time_end'     => $firstSchedule ? substr($firstSchedule->end_time, 0, 5) : '-',
                         'is_available' => !$hasActiveCheckin,
                     ]);
                 }
@@ -77,13 +85,20 @@ class CheckinController extends Controller
             return back()->withErrors(['pin' => 'PIN ไม่ถูกต้อง']);
         }
 
+        // หา Schedule เฉพาะของ "พนักงานคนนี้"
         $schedule = Schedule::where('counter_sub_id', $request->counter_id)
+            ->where('staff_id', $staff->staff_id)
             ->where('schedule_date', now()->toDateString())
             ->first();
 
+        // เช็คหาคนที่กำลังใช้อยู่ปัจจุบัน (จาก schedule_id ไหนก็ได้ของเคาน์เตอร์นี้)
+        $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
+            ->where('schedule_date', now()->toDateString())
+            ->pluck('schedule_id');
+
         $activeCheckin = null;
-        if ($schedule) {
-            $activeCheckin = Checkin::where('schedule_id', $schedule->schedule_id)
+        if ($allSchedulesToday->isNotEmpty()) {
+            $activeCheckin = Checkin::whereIn('schedule_id', $allSchedulesToday)
                 ->whereNull('checkout_at')
                 ->first();
         }
@@ -126,16 +141,22 @@ class CheckinController extends Controller
             'staff_id'   => 'required'
         ]);
 
+        // ดึง Schedule ของพนักงานคนนี้
         $schedule = Schedule::where('counter_sub_id', $request->counter_id)
+            ->where('staff_id', $request->staff_id)
             ->where('schedule_date', now()->toDateString())
             ->first();
 
-        if ($schedule) {
-            $activeCheckin = Checkin::where('schedule_id', $schedule->schedule_id)
+        // Auto-Kick บุคลากรเดิมที่ค้างอยู่ (ดึงจากทุก Schedule ของเคาน์เตอร์นี้)
+        $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
+            ->where('schedule_date', now()->toDateString())
+            ->pluck('schedule_id');
+
+        if ($allSchedulesToday->isNotEmpty()) {
+            $activeCheckin = Checkin::whereIn('schedule_id', $allSchedulesToday)
                 ->whereNull('checkout_at')
                 ->first();
 
-            // Auto-Kick บุคลากรเดิมที่ค้างอยู่
             if ($activeCheckin) {
                 $activeCheckin->checkout_at = now();
                 $activeCheckin->duration_min = now()->diffInMinutes(Carbon::parse($activeCheckin->checkin_at));
@@ -153,8 +174,6 @@ class CheckinController extends Controller
         $newCheckin->save();
 
         $staff = Staff::where('staff_id', $request->staff_id)->first();
-        
-        // ดึง Location (ตำแหน่งชั้น) จากตาราง counter หลัก
         $counterSub = CounterSub::with('counter')->where('counter_sub_id', $request->counter_id)->first();
         $counterName = $counterSub ? 'เคาน์เตอร์ ' . $counterSub->counter_id . '.' . $counterSub->counter_sub_id : 'เคาน์เตอร์ ' . $request->counter_id;
         $locationName = ($counterSub && $counterSub->counter) ? $counterSub->counter->counter_location : 'ไม่ระบุตำแหน่ง';
@@ -175,7 +194,6 @@ class CheckinController extends Controller
             $showWarningBar = now()->diffInMinutes($timeEnd, false) <= 15 && now()->isBefore($timeEnd);
         }
 
-        // ดึงข้อมูลการประเมิน
         $evaluations = collect([]);
         if (class_exists(Evaluation::class)) {
             $evaluations = Evaluation::whereIn('checkin_id', function($query) use ($staff) {
@@ -188,15 +206,13 @@ class CheckinController extends Controller
         $reviewStats = (object)[
             'average' => $evaluations->count() > 0 ? number_format($evaluations->avg('rating'), 1) : '0.0',
             'total'   => $evaluations->count(),
-            'negative'=> $evaluations->where('rating', '<=', 3)->count(),
+            'negative'=> $evaluations->where('rating', '<=', 2)->count(),
             'current_counter_total' => $evaluations->count(),
             'current_counter_average' => $evaluations->count() > 0 ? number_format($evaluations->avg('rating'), 1) : '0.0',
         ];
 
         $reviewsList = $evaluations->map(function($eval) {
-            // ป้องกัน Error กรณี Model Evaluation ไม่มี Timestamp
             $dateSource = $eval->created_at ?? now(); 
-            
             return (object)[
                 'date'    => Carbon::parse($dateSource)->translatedFormat('j M.'),
                 'time'    => Carbon::parse($dateSource)->format('H:i'),

@@ -17,6 +17,7 @@ class ScheduleController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'staff_id'      => 'required|integer', // เพิ่มการตรวจสอบ staff_id
             'schedule_date' => 'required|date',   
             'start_time'    => 'required',        
             'end_time'      => 'required',        
@@ -24,6 +25,7 @@ class ScheduleController extends Controller
         ]);
 
         $newSchedule = new Schedule();
+        $newSchedule->staff_id = $request->staff_id; // บันทึก staff_id
         $newSchedule->schedule_date = $request->schedule_date;
         $newSchedule->start_time = $request->start_time;
         $newSchedule->end_time = $request->end_time;
@@ -36,6 +38,7 @@ class ScheduleController extends Controller
     public function update(Request $request, $schedule_id)
     {
         $request->validate([
+            'staff_id'      => 'required|integer',
             'schedule_date' => 'required|date',
             'start_time'    => 'required',
             'end_time'      => 'required',
@@ -44,6 +47,7 @@ class ScheduleController extends Controller
 
         $schedule = Schedule::find($schedule_id);
         if ($schedule) {
+            $schedule->staff_id = $request->staff_id;
             $schedule->schedule_date = $request->schedule_date;
             $schedule->start_time = $request->start_time;
             $schedule->end_time = $request->end_time;
