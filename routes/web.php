@@ -13,6 +13,7 @@ Route::get('/', function () {
 });
 
 Route::resource('staff', StaffController::class);
+Route::post('/staff/reset-pins', [StaffController::class, 'resetAllPins'])->name('staff.resetPins');
 
 Route::resource('counter', CounterController::class);
 Route::post('/counter/{counterId}/sub', [CounterController::class, 'storeSub'])->name('counter.storeSub');

@@ -17,7 +17,6 @@
     <main>
         
         @if(isset($is_closed) && $is_closed)
-            <!-- แจ้งเตือนเมื่อสแกน QR Code ตอนที่ไม่มีเจ้าหน้าที่ประจำเคาน์เตอร์ -->
             <div class="survey-card" style="text-align: center; padding: 50px 20px;">
                 <div class="big-emoji">😴</div>
                 <h1 style="color: #4a5568; margin-top: 15px;">เคาน์เตอร์ยังไม่เปิดให้บริการ</h1>
@@ -25,7 +24,6 @@
             </div>
 
         @elseif(session('success'))
-            <!-- หน้าขอบคุณหลังประเมินเสร็จ -->
             <div class="survey-card thank-you-card">
                 <div class="big-emoji">😁</div>
                 <h1>ขอบคุณสำหรับการประเมิน!</h1>
@@ -44,7 +42,6 @@
             </script>
 
         @else
-            <!-- ฟอร์มประเมิน -->
             <div class="survey-card">
                 <div class="tag">{{ $counter_name }}</div>
                 <h1>ประเมินความพึงพอใจ</h1>
@@ -53,7 +50,6 @@
                 <form action="{{ route('evaluation.store') }}" method="POST">
                     @csrf 
 
-                    <!-- ระบบดึงค่า checkin_id มายัดใส่ให้โดยอัตโนมัติ -->
                     <input type="hidden" name="checkin_id" value="{{ $checkin_id }}">
                     <input type="hidden" name="counter_sub_id" value="{{ $counter_sub_id }}">
 

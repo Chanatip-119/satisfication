@@ -126,7 +126,8 @@
                 <div class="tab" onclick="switchTab('subcounters')" id="tab-subcounter-nav">Sub-Counters</div>
             </div>
 
-            <form action="{{ route('counter.store') }}" method="POST" id="form-general">
+            <!-- รวมฟอร์มทั้งหมดเป็นก้อนเดียว -->
+            <form action="{{ route('counter.store') }}" method="POST" id="form-unified">
                 @csrf
                 <input type="hidden" name="_method" id="form-method" value="POST">
                 
@@ -156,11 +157,27 @@
 
                     <div class="modal-footer" style="margin-top: 30px;">
                         <button type="button" class="btn btn-outline" onclick="closeModal('modal-counter')">ยกเลิก</button>
-                        <button type="submit" class="btn btn-yellow">บันทึก</button>
+                        <button type="submit" class="btn btn-yellow">บันทึกข้อมูล</button>
+                    </div>
+                </div>
+
+                <div id="tab-subcounters" class="tab-content">
+                    <div class="sub-counter-header">
+                        <span>Sub-Counter คือช่วงเวลาบริการของเคาน์เตอร์นี้</span>
+                        <button type="button" class="btn btn-yellow" style="padding: 6px 12px; font-size: 13px;" onclick="addSubCounterField()">+ เพิ่ม Sub</button>
+                    </div>
+                    
+                    <div class="sub-counter-list" id="sub-counter-list-container">
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('modal-counter')">ยกเลิก</button>
+                        <button type="submit" class="btn btn-yellow">บันทึกข้อมูลทั้งหมด</button>
                     </div>
                 </div>
             </form>
 
+            <!-- กล่องลบข้อมูล แยกออกมาเพื่อป้องกัน Form ซ้อน Form -->
             <div id="tab-general-delete" class="tab-content">
                 <div class="delete-box" id="delete-section" style="display: none;">
                     <div>
@@ -176,24 +193,6 @@
                         </button>
                     </form>
                 </div>
-            </div>
-
-            <div id="tab-subcounters" class="tab-content">
-                <div class="sub-counter-header">
-                    <span>Sub-Counter คือช่วงเวลาบริการของเคาน์เตอร์นี้</span>
-                    <button type="button" class="btn btn-yellow" style="padding: 6px 12px; font-size: 13px;" onclick="addSubCounterField()">+ เพิ่ม Sub</button>
-                </div>
-                
-                <form id="form-subcounter" method="POST" action="">
-                    @csrf
-                    <div class="sub-counter-list" id="sub-counter-list-container">
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline" onclick="closeModal('modal-counter')">ยกเลิก</button>
-                        <button type="submit" class="btn btn-yellow">บันทึก Sub-Counter</button>
-                    </div>
-                </form>
             </div>
 
         </div>
@@ -226,14 +225,13 @@
                     document.querySelector('input[name="is_active"][value="0"]').click();
                 }
                 
-                document.getElementById('form-general').action = `/counter/${data.counter_id}`;
+                document.getElementById('form-unified').action = `/counter/${data.counter_id}`;
                 document.getElementById('form-method').value = 'PUT';
                 
                 document.getElementById('delete-section').style.display = 'flex';
                 document.getElementById('form-delete').action = `/counter/${data.counter_id}`;
                 
                 document.getElementById('tab-subcounter-nav').style.display = 'block';
-                document.getElementById('form-subcounter').action = `/counter/${data.counter_id}/sub`;
                 
                 const container = document.getElementById('sub-counter-list-container');
                 container.innerHTML = '';
@@ -288,17 +286,19 @@
 
             } else {
                 document.getElementById('modal-title').innerText = 'เพิ่มเคาน์เตอร์ใหม่';
-                document.getElementById('modal-subtitle').innerText = 'กรอกข้อมูลทั่วไป';
-                document.getElementById('form-general').reset();
+                document.getElementById('modal-subtitle').innerText = 'กรอกข้อมูล และเพิ่ม Sub-counter ล่วงหน้าได้เลย';
+                document.getElementById('form-unified').reset();
                 
                 document.getElementById('inp_counter_id').readOnly = false;
-                document.getElementById('form-general').action = `{{ route('counter.store') }}`;
+                document.getElementById('form-unified').action = `{{ route('counter.store') }}`;
                 document.getElementById('form-method').value = 'POST';
 
                 document.querySelector('input[name="is_active"][value="1"]').click();
                 document.getElementById('delete-section').style.display = 'none';
                 
-                document.getElementById('tab-subcounter-nav').style.display = 'none';
+                // เปิดให้แท็บ Sub-Counters ทำงานได้ตั้งแต่โหมดเพิ่มข้อมูล
+                document.getElementById('tab-subcounter-nav').style.display = 'block';
+                document.getElementById('sub-counter-list-container').innerHTML = ''; 
                 
                 document.getElementById('tab-btn-general').click();
             }
@@ -312,7 +312,6 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             
-            // หาปุ่ม Tab ที่กดแล้วเพิ่ม class
             if(tabName === 'general') {
                 document.getElementById('tab-btn-general').classList.add('active');
                 document.getElementById('tab-general').classList.add('active');
@@ -369,7 +368,8 @@
 
         function addSubCounterField() {
             const container = document.getElementById('sub-counter-list-container');
-            const currentCounterId = document.getElementById('inp_counter_id').value; 
+            // ใช้เครื่องหมาย - ถ้าช่อง ID ว่างอยู่
+            const currentCounterId = document.getElementById('inp_counter_id').value || '-'; 
             currentMaxSubId++;
 
             const isActiveVal = document.querySelector('input[name="is_active"]:checked').value;

@@ -81,6 +81,7 @@ class ReportController extends Controller
             $status = $activeCheckin ? 'Check-in' : 'Check-out';
 
             $staffReportList[] = (object)[
+                'staff_id' => $staff->staff_id,
                 'name' => $staff->staff_name,
                 'code' => 'BUU-' . str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT),
                 'avg_rating' => $avgRating,

@@ -54,14 +54,14 @@
             <a href="javascript:void(0)" onclick="openModal('modal-reset')">แก้ไขการตั้งค่า</a>
         </div>
 
-        <div class="filter-row">
-            <input type="text" class="search-box" placeholder=" ค้นหาชื่อหรือ....">
-            <select class="dropdown-box">
-                <option>ทุกสถานะ</option>
-                <option>Active</option>
-                <option>Offline</option>
+        <form action="{{ route('staff.index') }}" method="GET" class="filter-row" id="search-form">
+            <input type="text" name="search" class="search-box" placeholder="ค้นหาชื่อหรือบทบาท...." value="{{ request('search') }}">
+            <select name="status" class="dropdown-box" onchange="document.getElementById('search-form').submit();">
+                <option value="">ทุกสถานะ</option>
+                <option value="Active" {{ request('status') == 'Active' ? 'selected' : '' }}>Active</option>
+                <option value="Offline" {{ request('status') == 'Offline' ? 'selected' : '' }}>Offline</option>
             </select>
-        </div>
+        </form>
 
         <div class="table-card">
             <table>
@@ -88,7 +88,11 @@
                             </span>
                         </td>
                         <td>
-                            <span class="text-green">-</span>
+                            @if($staff->avg_rating !== '-')
+                                <span class="badge" style="background: #c6f6d5; color: #22543d; font-weight: 600;">{{ $staff->avg_rating }}</span>
+                            @else
+                                <span class="text-green">-</span>
+                            @endif
                         </td>
                         <td>
                             {{ $staff->staff_pincode }}
@@ -315,39 +319,61 @@
     </div>
 
     <div id="modal-reset" class="modal-overlay">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <div>
                     <h2>Reset Pin Code ทั้งชุด</h2>
-                    <p>สุ่ม PIN ใหม่ให้บุคลากรทั้งหมด 50 คน และส่งทาง Gmail</p>
+                    <p style="color: #718096; font-size: 14px;">สุ่ม PIN ใหม่ให้บุคลากรทั้งหมด 50 คน และส่งทาง Gmail — ดำเนินการได้เฉพาะ Admin/SuperAdmin</p>
                 </div>
-                <span class="close-btn" onclick="closeModal('modal-reset')">&times;</span>
+                <span class="close-btn" onclick="closeModal('modal-reset')" style="cursor: pointer; font-size: 24px;">&times;</span>
             </div>
             
-            <div style="background: #fff5f5; color: #e53e3e; padding: 15px; border-radius: 8px; border: 1px solid #fed7d7; font-size: 13px; margin-bottom: 20px;">
-                 PIN เดิมของทุกคนจะใช้งานไม่ได้ทันทีหลัง Reset — บุคลากรต้องตรวจสอบ Gmail เพื่อรับ PIN ใหม่ก่อน Check-in ครั้งถัดไป
+            <div style="background: #fff5f5; color: #e53e3e; padding: 15px; border-radius: 8px; border: 1px solid #fed7d7; font-size: 13px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 10px;">
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 20px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                 <span>PIN เดิมของทุกคนจะใช้งานไม่ได้ทันทีหลัง Reset — บุคลากรต้องตรวจสอบ Gmail เพื่อรับ PIN ใหม่ก่อน Check-in ครั้งถัดไป</span>
             </div>
 
-            <form action="#" method="POST">
+            <form action="{{ route('staff.resetPins') }}" method="POST">
                 @csrf
-                <h4>รูปแบบการ Reset</h4>
-                <label class="reset-option active">
-                    <input type="radio" name="reset_type" value="now" checked>
+                <h4 style="margin-bottom: 15px;">รูปแบบการ Reset</h4>
+                
+                <label class="reset-option active" id="lbl-reset-now" onclick="toggleResetOptions('now')">
+                    <input type="radio" name="reset_type" value="now" checked style="margin-top: 4px;">
                     <div>
-                        <strong>Reset ทันที</strong><br>
+                        <strong style="color: #1a202c; font-size: 15px;">Reset ทันที</strong><br>
                         <span style="font-size: 13px; color:#718096;">สุ่ม PIN ใหม่ทั้งหมด 50 รายการ และส่ง Gmail ทันทีที่กดยืนยัน</span>
                     </div>
                 </label>
-                <label class="reset-option">
-                    <input type="radio" name="reset_type" value="schedule">
-                    <div>
-                        <strong>ตั้งเวลาล่วงหน้า (Recurring)</strong><br>
-                        <span style="font-size: 13px; color:#718096;">ระบบ Reset ให้อัตโนมัติตามรอบที่กำหนด</span>
+                
+                <div style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px;" id="box-reset-schedule">
+                    <label class="reset-option" id="lbl-reset-schedule" style="border: none; margin-bottom: 0;" onclick="toggleResetOptions('schedule')">
+                        <input type="radio" name="reset_type" value="schedule" style="margin-top: 4px;">
+                        <div>
+                            <strong style="color: #1a202c; font-size: 15px;">ตั้งเวลาล่วงหน้า (Recurring)</strong><br>
+                            <span style="font-size: 13px; color:#718096;">ระบบ Reset ให้อัตโนมัติตามรอบที่กำหนด</span>
+                        </div>
+                    </label>
+                    
+                    <div id="schedule-settings" style="display: none; padding: 0 20px 20px 45px;">
+                        <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; background: #fdfdfd; padding: 10px; border-radius: 6px; border: 1px solid #edf2f7; cursor: pointer;">
+                            <input type="radio" name="schedule_interval" value="days" checked>
+                            ทุก <input type="number" name="schedule_days" value="30" style="width: 50px; text-align: center; border: 1px solid #cbd5e0; border-radius: 4px; padding: 4px;"> วัน
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 10px; background: #fdfdfd; padding: 10px; border-radius: 6px; border: 1px solid #edf2f7; cursor: pointer;">
+                            <input type="radio" name="schedule_interval" value="month">
+                            ทุกวันที่ 
+                            <select name="schedule_month_day" style="border: 1px solid #cbd5e0; border-radius: 4px; padding: 4px;">
+                                @for($i=1; $i<=31; $i++)
+                                    <option value="{{ $i }}">{{ $i }}</option>
+                                @endfor
+                            </select> 
+                            ของเดือน
+                        </label>
                     </div>
-                </label>
+                </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn" onclick="closeModal('modal-reset')">ยกเลิก</button>
+                <div class="modal-footer" style="margin-top: 30px;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('modal-reset')">ยกเลิก</button>
                     <button type="submit" class="btn btn-yellow">ยืนยัน Reset</button>
                 </div>
             </form>
@@ -540,6 +566,35 @@
 
             select.dataset.originalValue = select.value;
         });
+
+        let searchTimer;
+        document.querySelector('input[name="search"]').addEventListener('input', function() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                document.getElementById('search-form').submit();
+            }, 600);
+        });
+
+        function toggleResetOptions(type) {
+            const lblNow = document.getElementById('lbl-reset-now');
+            const boxSchedule = document.getElementById('box-reset-schedule');
+            const lblSchedule = document.getElementById('lbl-reset-schedule');
+            const settings = document.getElementById('schedule-settings');
+
+            if (type === 'now') {
+                lblNow.classList.add('active');
+                lblNow.style.borderColor = '#ecc94b';
+                boxSchedule.style.borderColor = '#e2e8f0';
+                lblSchedule.classList.remove('active');
+                settings.style.display = 'none';
+            } else {
+                lblNow.classList.remove('active');
+                lblNow.style.borderColor = '#e2e8f0';
+                boxSchedule.style.borderColor = '#ecc94b';
+                lblSchedule.classList.add('active');
+                settings.style.display = 'block';
+            }
+        }
     </script>
 </body>
 </html>

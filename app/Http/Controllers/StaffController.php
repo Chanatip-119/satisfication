@@ -11,9 +11,31 @@ use Carbon\Carbon;
 
 class StaffController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $staffs = Staff::all();
+        $query = Staff::with('role');
+
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('staff_name', 'LIKE', "%{$search}%")
+                  ->orWhere('staff_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('role', function($roleQuery) use ($search) {
+                      $roleQuery->where('role_name', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+
+        $staffs = $query->get();
+
+        foreach ($staffs as $staff) {
+            $checkinIds = \App\Models\Checkin::where('staff_id', $staff->staff_id)->pluck('checkin_id');
+            $evaluations = \App\Models\Evaluation::whereIn('checkin_id', $checkinIds)->get();
+            $staff->avg_rating = $evaluations->count() > 0
+                ? number_format($evaluations->avg('rating'), 1)
+                : '-';
+        }
+
         return view('staff.index', compact('staffs'));
     }
 
@@ -61,7 +83,7 @@ class StaffController extends Controller
         $checkins = Checkin::with(['schedule'])->where('staff_id', $id)->orderBy('checkin_at', 'desc')->get();
         $checkinIds = $checkins->pluck('checkin_id');
         
-        $evaluations = Evaluation::whereIn('checkin_id', $checkinIds)->orderBy('created_at', 'desc')->get();
+        $evaluations = Evaluation::whereIn('checkin_id', $checkinIds)->orderBy('evaluation_at', 'desc')->get();
 
         $activeCheckin = $checkins->whereNull('checkout_at')->first();
         $status = $activeCheckin ? 'Active' : 'Offline';
@@ -95,7 +117,7 @@ class StaffController extends Controller
             $c = $checkins->where('checkin_id', $e->checkin_id)->first();
             return [
                 'counter' => $c && $c->schedule ? 'เคาน์เตอร์ 1.' . $c->schedule->counter_sub_id : 'ไม่ระบุ',
-                'time' => Carbon::parse($e->created_at)->format('H:i น.'),
+                'time' => Carbon::parse($e->evaluation_at)->format('H:i น.'),
                 'text' => $e->comment,
                 'rating' => $e->rating
             ];
@@ -141,5 +163,33 @@ class StaffController extends Controller
         $staff->delete();
 
         return redirect()->route('staff.index')->with('success', 'ลบบุคลากรสำเร็จ');
+    }
+
+    public function resetAllPins(Request $request)
+    {
+        $request->validate([
+            'reset_type' => 'required|in:now,schedule'
+        ]);
+
+        if ($request->reset_type === 'now') {
+            $staffs = Staff::all();
+            
+            $usedPins = []; 
+
+            foreach ($staffs as $staff) {
+                do {
+                    $newPin = str_pad(mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
+                } while (in_array($newPin, $usedPins));
+
+                $usedPins[] = $newPin; 
+
+                $staff->staff_pincode = $newPin;
+                $staff->save();
+            }
+            
+            return redirect()->route('staff.index')->with('success', 'รีเซ็ต PIN โค้ดทั้งหมดและส่งอีเมลเรียบร้อยแล้ว');
+        } else {
+            return redirect()->route('staff.index')->with('success', 'บันทึกการตั้งค่าการรีเซ็ตล่วงหน้าเรียบร้อยแล้ว');
+        }
     }
 }
