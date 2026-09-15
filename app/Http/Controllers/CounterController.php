@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Checkin;
 use App\Models\Evaluation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CounterController extends Controller
 {
@@ -34,30 +35,31 @@ class CounterController extends Controller
             'is_active' => 'required|boolean',
         ]);
 
-        $counter = Counter::create($validated);
+        DB::transaction(function () use ($validated, $request) {
+            $counter = Counter::create($validated);
+            // จัดการสร้าง Sub-Counter แบบรวดเดียวตอนสร้างเคาน์เตอร์หลัก
+            if ($request->has('new_start_time')) {
+                foreach ($request->new_start_time as $index => $startTime) {
+                    $endTime = $request->new_end_time[$index] ?? '16:00';
+                    $isActive = $request->new_is_active[$index] ?? 1;
 
-        // จัดการสร้าง Sub-Counter แบบรวดเดียวตอนสร้างเคาน์เตอร์หลัก
-        if ($request->has('new_start_time')) {
-            foreach ($request->new_start_time as $index => $startTime) {
-                $endTime = $request->new_end_time[$index] ?? '16:00';
-                $isActive = $request->new_is_active[$index] ?? 1;
+                    $newSub = $counter->countersubs()->create([
+                        'is_active' => $isActive
+                    ]);
 
-                $newSub = $counter->countersubs()->create([
-                    'is_active' => $isActive
-                ]);
-
-                Schedule::updateOrCreate(
-                    [
-                        'counter_sub_id' => $newSub->counter_sub_id,
-                        'schedule_date' => now()->toDateString(), 
-                    ],
-                    [
-                        'start_time' => $startTime,
-                        'end_time' => $endTime,
-                    ]
-                );
+                    Schedule::updateOrCreate(
+                        [
+                            'counter_sub_id' => $newSub->counter_sub_id,
+                            'schedule_date' => now()->toDateString(), 
+                        ],
+                        [
+                            'start_time' => $startTime,
+                            'end_time' => $endTime,
+                        ]
+                    );
+                }
             }
-        }
+        });
 
         return redirect()->route('counter.index')->with('success', 'เพิ่มข้อมูลเคาน์เตอร์และช่วงเวลาสำเร็จ');
     }
@@ -70,55 +72,58 @@ class CounterController extends Controller
         ]);
 
         $counter = Counter::findOrFail($id);
-        $counter->update($validated);
 
-        // จัดการเพิ่ม Sub-Counter ตัวใหม่ที่ถูกกดเพิ่มเข้ามาตอนแก้ไข
-        if ($request->has('new_start_time')) {
-            foreach ($request->new_start_time as $index => $startTime) {
-                $endTime = $request->new_end_time[$index] ?? '16:00';
-                $isActive = $request->new_is_active[$index] ?? 1;
+        DB::transaction(function () use ($counter, $validated, $request) {
+            $counter->update($validated);
 
-                $newSub = $counter->countersubs()->create([
-                    'is_active' => $isActive
-                ]);
+            // จัดการเพิ่ม Sub-Counter ตัวใหม่ที่ถูกกดเพิ่มเข้ามาตอนแก้ไข
+            if ($request->has('new_start_time')) {
+                foreach ($request->new_start_time as $index => $startTime) {
+                    $endTime = $request->new_end_time[$index] ?? '16:00';
+                    $isActive = $request->new_is_active[$index] ?? 1;
 
-                Schedule::updateOrCreate(
-                    [
-                        'counter_sub_id' => $newSub->counter_sub_id,
-                        'schedule_date' => now()->toDateString(), 
-                    ],
-                    [
-                        'start_time' => $startTime,
-                        'end_time' => $endTime,
-                    ]
-                );
-            }
-        }
-
-        // จัดการอัปเดตข้อมูล Sub-Counter เดิมที่มีอยู่แล้ว
-        if ($request->has('existing_sub_id')) {
-            foreach ($request->existing_sub_id as $index => $subId) {
-                $startTime = $request->existing_start_time[$index] ?? '08:00';
-                $endTime = $request->existing_end_time[$index] ?? '16:00';
-
-                if (isset($request->existing_is_active[$index])) {
-                    $counter->countersubs()->where('counter_sub_id', $subId)->update([
-                        'is_active' => $request->existing_is_active[$index]
+                    $newSub = $counter->countersubs()->create([
+                        'is_active' => $isActive
                     ]);
-                }
 
-                Schedule::updateOrCreate(
-                    [
-                        'counter_sub_id' => $subId,
-                        'schedule_date' => now()->toDateString(), 
-                    ],
-                    [
-                        'start_time' => $startTime,
-                        'end_time' => $endTime,
-                    ]
-                );
+                    Schedule::updateOrCreate(
+                        [
+                            'counter_sub_id' => $newSub->counter_sub_id,
+                            'schedule_date' => now()->toDateString(), 
+                        ],
+                        [
+                            'start_time' => $startTime,
+                            'end_time' => $endTime,
+                        ]
+                    );
+                }
             }
-        }
+
+            // จัดการอัปเดตข้อมูล Sub-Counter เดิมที่มีอยู่แล้ว
+            if ($request->has('existing_sub_id')) {
+                foreach ($request->existing_sub_id as $index => $subId) {
+                    $startTime = $request->existing_start_time[$index] ?? '08:00';
+                    $endTime = $request->existing_end_time[$index] ?? '16:00';
+
+                    if (isset($request->existing_is_active[$index])) {
+                        $counter->countersubs()->where('counter_sub_id', $subId)->update([
+                            'is_active' => $request->existing_is_active[$index]
+                        ]);
+                    }
+
+                    Schedule::updateOrCreate(
+                        [
+                            'counter_sub_id' => $subId,
+                            'schedule_date' => now()->toDateString(), 
+                        ],
+                        [
+                            'start_time' => $startTime,
+                            'end_time' => $endTime,
+                        ]
+                    );
+                }
+            }
+        });
 
         return redirect()->route('counter.index')->with('success', 'อัปเดตข้อมูลเคาน์เตอร์สำเร็จ');
     }
@@ -127,26 +132,28 @@ class CounterController extends Controller
     {
         $counter = Counter::findOrFail($id);
 
-        $subIds = $counter->countersubs()->pluck('counter_sub_id');
+        DB::transaction(function () use ($counter) {
+            $subIds = $counter->countersubs()->pluck('counter_sub_id');
 
-        if ($subIds->isNotEmpty()) {
-            $scheduleIds = Schedule::whereIn('counter_sub_id', $subIds)->pluck('schedule_id');
+            if ($subIds->isNotEmpty()) {
+                $scheduleIds = Schedule::whereIn('counter_sub_id', $subIds)->pluck('schedule_id');
 
-            if ($scheduleIds->isNotEmpty()) {
-                $checkinIds = Checkin::whereIn('schedule_id', $scheduleIds)->pluck('checkin_id');
+                if ($scheduleIds->isNotEmpty()) {
+                    $checkinIds = Checkin::whereIn('schedule_id', $scheduleIds)->pluck('checkin_id');
 
-                if ($checkinIds->isNotEmpty()) {
-                    Evaluation::whereIn('checkin_id', $checkinIds)->delete();
-                    Checkin::whereIn('schedule_id', $scheduleIds)->delete();
+                    if ($checkinIds->isNotEmpty()) {
+                        Evaluation::whereIn('checkin_id', $checkinIds)->delete();
+                        Checkin::whereIn('schedule_id', $scheduleIds)->delete();
+                    }
+
+                    Schedule::whereIn('counter_sub_id', $subIds)->delete();
                 }
 
-                Schedule::whereIn('counter_sub_id', $subIds)->delete();
+                $counter->countersubs()->delete();
             }
 
-            $counter->countersubs()->delete();
-        }
-
-        $counter->delete();
+            $counter->delete();
+        });
 
         return redirect()->route('counter.index')->with('success', 'ลบเคาน์เตอร์และข้อมูลที่เกี่ยวข้องทั้งหมดสำเร็จ');
     }
@@ -164,18 +171,20 @@ class CounterController extends Controller
                                 ->first();
 
         if ($counterSub) {
-            $scheduleIds = Schedule::where('counter_sub_id', $subId)->pluck('schedule_id');
-            
-            if ($scheduleIds->isNotEmpty()) {
-                $checkinIds = Checkin::whereIn('schedule_id', $scheduleIds)->pluck('checkin_id');
-                if ($checkinIds->isNotEmpty()) {
-                    Evaluation::whereIn('checkin_id', $checkinIds)->delete();
-                    Checkin::whereIn('schedule_id', $scheduleIds)->delete();
+            DB::transaction(function () use ($counterSub, $subId) {
+                $scheduleIds = Schedule::where('counter_sub_id', $subId)->pluck('schedule_id');
+                
+                if ($scheduleIds->isNotEmpty()) {
+                    $checkinIds = Checkin::whereIn('schedule_id', $scheduleIds)->pluck('checkin_id');
+                    if ($checkinIds->isNotEmpty()) {
+                        Evaluation::whereIn('checkin_id', $checkinIds)->delete();
+                        Checkin::whereIn('schedule_id', $scheduleIds)->delete();
+                    }
+                    Schedule::where('counter_sub_id', $subId)->delete();
                 }
-                Schedule::where('counter_sub_id', $subId)->delete();
-            }
 
-            $counterSub->delete();
+                $counterSub->delete();
+            });
         }
 
         return redirect()->route('counter.index')->with('success', 'ลบเคาน์เตอร์ย่อยสำเร็จ');

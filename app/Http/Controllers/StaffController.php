@@ -7,26 +7,14 @@ use App\Models\Staff;
 use App\Models\Checkin;
 use App\Models\Evaluation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class StaffController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = Staff::with('role');
-
-        if ($request->has('search') && $request->search != '') {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('staff_name', 'LIKE', "%{$search}%")
-                  ->orWhere('staff_id', 'LIKE', "%{$search}%")
-                  ->orWhereHas('role', function($roleQuery) use ($search) {
-                      $roleQuery->where('role_name', 'LIKE', "%{$search}%");
-                  });
-            });
-        }
-
-        $staffs = $query->get();
+        $staffs = Staff::with('role')->get();
 
         foreach ($staffs as $staff) {
             $checkinIds = \App\Models\Checkin::where('staff_id', $staff->staff_id)->pluck('checkin_id');
@@ -160,36 +148,21 @@ class StaffController extends Controller
     public function destroy($id)
     {
         $staff = Staff::findOrFail($id);
-        $staff->delete();
+
+        DB::transaction(function () use ($staff) {
+            // ลบ Evaluation ที่เกี่ยวข้องกับ Checkin ของพนักงานคนนี้
+            $checkinIds = Checkin::where('staff_id', $staff->staff_id)->pluck('checkin_id');
+            if ($checkinIds->isNotEmpty()) {
+                Evaluation::whereIn('checkin_id', $checkinIds)->delete();
+            }
+
+            // ลบ Checkin ของพนักงานคนนี้
+            Checkin::where('staff_id', $staff->staff_id)->delete();
+
+            // ลบ Staff
+            $staff->delete();
+        });
 
         return redirect()->route('staff.index')->with('success', 'ลบบุคลากรสำเร็จ');
-    }
-
-    public function resetAllPins(Request $request)
-    {
-        $request->validate([
-            'reset_type' => 'required|in:now,schedule'
-        ]);
-
-        if ($request->reset_type === 'now') {
-            $staffs = Staff::all();
-            
-            $usedPins = []; 
-
-            foreach ($staffs as $staff) {
-                do {
-                    $newPin = str_pad(mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
-                } while (in_array($newPin, $usedPins));
-
-                $usedPins[] = $newPin; 
-
-                $staff->staff_pincode = $newPin;
-                $staff->save();
-            }
-            
-            return redirect()->route('staff.index')->with('success', 'รีเซ็ต PIN โค้ดทั้งหมดและส่งอีเมลเรียบร้อยแล้ว');
-        } else {
-            return redirect()->route('staff.index')->with('success', 'บันทึกการตั้งค่าการรีเซ็ตล่วงหน้าเรียบร้อยแล้ว');
-        }
     }
 }

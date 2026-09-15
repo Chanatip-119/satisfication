@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Staff;
 use App\Models\Evaluation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class CheckinController extends Controller
@@ -147,31 +148,35 @@ class CheckinController extends Controller
             ->where('schedule_date', now()->toDateString())
             ->first();
 
-        // Auto-Kick บุคลากรเดิมที่ค้างอยู่ (ดึงจากทุก Schedule ของเคาน์เตอร์นี้)
-        $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
-            ->where('schedule_date', now()->toDateString())
-            ->pluck('schedule_id');
+        // Auto-Kick บุคลากรเดิมที่ค้างอยู่ + สร้าง Checkin ใหม่ (atomic operation)
+        $newCheckin = DB::transaction(function () use ($request, $schedule) {
+            $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
+                ->where('schedule_date', now()->toDateString())
+                ->pluck('schedule_id');
 
-        if ($allSchedulesToday->isNotEmpty()) {
-            $activeCheckin = Checkin::whereIn('schedule_id', $allSchedulesToday)
-                ->whereNull('checkout_at')
-                ->first();
+            if ($allSchedulesToday->isNotEmpty()) {
+                $activeCheckin = Checkin::whereIn('schedule_id', $allSchedulesToday)
+                    ->whereNull('checkout_at')
+                    ->first();
 
-            if ($activeCheckin) {
-                $activeCheckin->checkout_at = now();
-                $activeCheckin->duration_min = now()->diffInMinutes(Carbon::parse($activeCheckin->checkin_at));
-                $activeCheckin->is_kicked = 1;
-                $activeCheckin->save();
+                if ($activeCheckin) {
+                    $activeCheckin->checkout_at = now();
+                    $activeCheckin->duration_min = now()->diffInMinutes(Carbon::parse($activeCheckin->checkin_at));
+                    $activeCheckin->is_kicked = 1;
+                    $activeCheckin->save();
+                }
             }
-        }
 
-        $newCheckin = new Checkin();
-        $newCheckin->schedule_id = $schedule ? $schedule->schedule_id : null;
-        $newCheckin->staff_id = $request->staff_id;
-        $newCheckin->checkin_at = now();
-        $newCheckin->is_substitute = 0;
-        $newCheckin->is_kicked = 0;
-        $newCheckin->save();
+            $checkin = new Checkin();
+            $checkin->schedule_id = $schedule ? $schedule->schedule_id : null;
+            $checkin->staff_id = $request->staff_id;
+            $checkin->checkin_at = now();
+            $checkin->is_substitute = 0;
+            $checkin->is_kicked = 0;
+            $checkin->save();
+
+            return $checkin;
+        });
 
         $staff = Staff::where('staff_id', $request->staff_id)->first();
         $counterSub = CounterSub::with('counter')->where('counter_sub_id', $request->counter_id)->first();
