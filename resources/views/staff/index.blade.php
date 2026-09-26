@@ -16,7 +16,7 @@
 
         <div class="menu-category">หลัก</div>
         <a href="#" class="menu-item">แดชบอร์ด</a>
-        <a href="#" class="menu-item">ตารางปฏิบัติงาน</a>
+        <a href="{{ route('schedule.index') }}" class="menu-item {{ Route::is('schedule.index') ? 'active' : '' }}">ตารางปฏิบัติงาน</a>
         <a href="{{ route('report.counter') }}" class="menu-item {{ Route::is('report.counter') ? 'active' : '' }}">รายงานเคาน์เตอร์</a>
         <a href="{{ route('report.staff') }}" class="menu-item {{ Route::is('report.staff') ? 'active' : '' }}">รายงาน Staff</a>
 
@@ -26,7 +26,7 @@
         <a href="#" class="menu-item">QR Code</a>
 
         <div class="menu-category">ระบบ</div>
-        <a href="#" class="menu-item">ส่งออกรายงาน</a>
+        <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
 
         <a href="#" class="logout-btn">↩ Logout</a>
     </aside>
@@ -41,13 +41,35 @@
             <div class="action-buttons">
                 <button class="btn" onclick="openModal('modal-reset')"> Reset Unique ID ทั้งหมด</button>
                 <button class="btn" onclick="openModal('modal-import')"> Import Excel</button>
-                <form action="#" method="POST" style="display:inline;">
-                    @csrf
-                    <button type="submit" class="btn"> Export</button>
-                </form>
+                <a href="{{ route('staff.exportCsv') }}" class="btn"> Export CSV</a>
                 <button class="btn btn-yellow" onclick="openModal('modal-add-staff')">+ เพิ่มบุคลากร</button>
             </div>
         </div>
+
+        @if(session('success'))
+        <div class="alert-banner" style="background-color: #f0fff4; border-color: #c6f6d5; color: #22543d;">
+            <span>✅ {{ session('success') }}</span>
+            <a href="javascript:void(0)" onclick="this.parentElement.style.display='none'" style="color: #22543d;">✕</a>
+        </div>
+        @endif
+
+        @if(session('error'))
+        <div class="alert-banner" style="background-color: #fff5f5; border-color: #fed7d7; color: #e53e3e;">
+            <span>❌ {{ session('error') }}</span>
+            <a href="javascript:void(0)" onclick="this.parentElement.style.display='none'" style="color: #e53e3e;">✕</a>
+        </div>
+        @endif
+
+        @if(session('import_errors'))
+        <div class="alert-banner" style="background-color: #fffbeb; border-color: #fef3c7; color: #b45309; flex-direction: column; align-items: flex-start;">
+            <strong style="margin-bottom: 5px;">⚠️ รายละเอียด Import:</strong>
+            <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
+                @foreach(session('import_errors') as $err)
+                    <li>{{ $err }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
 
         <div class="alert-banner">
             <span> ตั้งค่ารีเซ็ต Unique ID อัตโนมัติ: ทุกวันที่ 1 ของเดือน— รีเซ็ตครั้งถัดไป 1 ก.ค. 2569</span>
@@ -383,21 +405,28 @@
     <div id="modal-import" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Import บุคลากรจาก Excel</h2>
+                <h2>Import บุคลากรจาก Excel / CSV</h2>
                 <span class="close-btn" onclick="closeModal('modal-import')">&times;</span>
             </div>
+
+            <div style="background: #ebf8ff; color: #2b6cb0; padding: 12px 15px; border-radius: 8px; border: 1px solid #bee3f8; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 18px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span>ดาวน์โหลด <a href="{{ route('staff.downloadTemplate') }}" style="color: #2b6cb0; font-weight: 700;">Template CSV</a> เพื่อใช้เป็นแม่แบบในการกรอกข้อมูล</span>
+            </div>
             
-            <form action="#" method="POST" enctype="multipart/form-data">
+            <form action="{{ route('staff.import') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                <div style="border: 2px dashed #cbd5e0; padding: 40px; text-align: center; border-radius: 10px; margin-bottom: 20px; background: #f7fafc;">
-                    <h3 style="color:#4a5568;">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</h3>
-                    <p style="color:#a0aec0; font-size: 13px;">.xlsx, .xls, .csv — ขนาดไม่เกิน 5MB</p>
-                    <input type="file" name="excel_file" style="margin-top: 15px;">
+                <div id="drop-zone" style="border: 2px dashed #cbd5e0; padding: 40px; text-align: center; border-radius: 10px; margin-bottom: 20px; background: #f7fafc; cursor: pointer; transition: all 0.3s ease;" onclick="document.getElementById('excel-file-input').click();">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="1.5" style="margin-bottom: 10px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <h3 style="color:#4a5568; margin-bottom: 5px;">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</h3>
+                    <p style="color:#a0aec0; font-size: 13px;">.csv — ขนาดไม่เกิน 5MB</p>
+                    <input type="file" name="excel_file" id="excel-file-input" accept=".csv,.xlsx,.xls" style="display: none;" onchange="showFileName(this)">
+                    <div id="file-name-display" style="display: none; margin-top: 15px; padding: 10px 15px; background: #e2e8f0; border-radius: 6px; font-size: 14px; font-weight: 600; color: #2d3748;"></div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeModal('modal-import')">ยกเลิก</button>
-                    <button type="submit" class="btn btn-yellow"> Import ทั้งหมด</button>
+                    <button type="submit" class="btn btn-yellow" id="btn-import-submit"> Import ทั้งหมด</button>
                 </div>
             </form>
         </div>
@@ -595,6 +624,60 @@
                 settings.style.display = 'block';
             }
         }
+
+        // ===== Import file upload helpers =====
+        function showFileName(input) {
+            const display = document.getElementById('file-name-display');
+            if (input.files && input.files[0]) {
+                display.style.display = 'block';
+                display.innerHTML = '📄 ' + input.files[0].name + ' (' + (input.files[0].size / 1024).toFixed(1) + ' KB)';
+                document.getElementById('drop-zone').style.borderColor = '#48bb78';
+                document.getElementById('drop-zone').style.background = '#f0fff4';
+            } else {
+                display.style.display = 'none';
+                document.getElementById('drop-zone').style.borderColor = '#cbd5e0';
+                document.getElementById('drop-zone').style.background = '#f7fafc';
+            }
+        }
+
+        // Drag and drop support
+        const dropZone = document.getElementById('drop-zone');
+        if (dropZone) {
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.style.borderColor = '#FFCC00';
+                    dropZone.style.background = '#fffbeb';
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.style.borderColor = '#cbd5e0';
+                    dropZone.style.background = '#f7fafc';
+                });
+            });
+
+            dropZone.addEventListener('drop', function(e) {
+                const fileInput = document.getElementById('excel-file-input');
+                if (e.dataTransfer.files.length > 0) {
+                    fileInput.files = e.dataTransfer.files;
+                    showFileName(fileInput);
+                }
+            });
+        }
+
+        // Auto-hide success alerts after 5 seconds
+        setTimeout(function() {
+            document.querySelectorAll('.alert-banner[style*="f0fff4"]').forEach(function(el) {
+                el.style.transition = 'opacity 0.5s ease';
+                el.style.opacity = '0';
+                setTimeout(() => el.style.display = 'none', 500);
+            });
+        }, 5000);
     </script>
 </body>
 </html>

@@ -16,10 +16,11 @@ class Evaluation extends Model
         'checkin_id'
     ];
 
-//    public function checkin()
-//    {
-//        return $this->belongsTo(Checkin::class, 'checkin_id', 'checkin_id');
-//    }
+    // เปิดใช้งานความสัมพันธ์เชื่อมกลับไปยัง Checkin เพื่อแก้ไขปัญหา BadMethodCallException
+    public function checkin()
+    {
+        return $this->belongsTo(Checkin::class, 'checkin_id', 'checkin_id');
+    }
 
     public function getRouteKeyName()
     {

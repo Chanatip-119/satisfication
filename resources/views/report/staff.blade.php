@@ -16,7 +16,7 @@
 
         <div class="menu-category">หลัก</div>
         <a href="#" class="menu-item">แดชบอร์ด</a>
-        <a href="#" class="menu-item">ตารางปฏิบัติงาน</a>
+        <a href="{{ route('schedule.index') }}" class="menu-item {{ Route::is('schedule.index') ? 'active' : '' }}">ตารางปฏิบัติงาน</a>
         <a href="{{ route('report.counter') }}" class="menu-item {{ Route::is('report.counter') ? 'active' : '' }}">รายงานเคาน์เตอร์</a>
         <a href="{{ route('report.staff') }}" class="menu-item {{ Route::is('report.staff') ? 'active' : '' }}">รายงาน Staff</a>
 
@@ -26,7 +26,7 @@
         <a href="#" class="menu-item">QR Code</a>
 
         <div class="menu-category">ระบบ</div>
-        <a href="#" class="menu-item">ส่งออกรายงาน</a>
+        <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
 
         <a href="#" class="logout-btn">↩ Logout</a>
     </aside>
