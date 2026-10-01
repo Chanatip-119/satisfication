@@ -3,7 +3,9 @@
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Sarabun', sans-serif; }
 body { display: flex; min-height: 100vh; background-color: #f2f4f6; }
 
-/* Sidebar */
+/* =========================================
+   Sidebar (แถบเมนูด้านซ้ายสีเหลือง)
+   ========================================= */
 .sidebar { width: 260px; background-color: #FFCC00; padding: 20px 0; display: flex; flex-direction: column; flex-shrink: 0;}
 .sidebar-logo { text-align: center; margin-bottom: 30px; padding: 0 20px; }
 .sidebar-logo img { width: 120px; background: rgba(0,0,0,0.1); border-radius: 50%; padding: 10px; }
@@ -13,7 +15,9 @@ body { display: flex; min-height: 100vh; background-color: #f2f4f6; }
 .menu-item.active { background-color: #ffffff; color: #FFCC00; border-radius: 0 30px 30px 0; margin-right: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
 .logout-btn { margin-top: auto; padding: 20px 30px; color: #ffffff; text-decoration: none; font-weight: 600; border-top: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; gap: 8px; }
 
-/* Main Content */
+/* =========================================
+   Main Content
+   ========================================= */
 .content { flex: 1; padding: 40px; overflow-y: auto; }
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; }
 .page-title h1 { font-size: 24px; color: #1a202c; font-weight: 700; margin-bottom: 5px; }
@@ -26,7 +30,9 @@ body { display: flex; min-height: 100vh; background-color: #f2f4f6; }
 .btn-outline { background-color: #fff; border-color: #cbd5e0; color: #4a5568; }
 .btn-outline:hover { background-color: #f7fafc; }
 
-/* Table */
+/* =========================================
+   Table
+   ========================================= */
 .table-card { background-color: #ffffff; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 1000px; }
 th { text-align: left; padding: 15px 10px; color: #a0aec0; font-size: 13px; font-weight: 600; border-bottom: 1px solid #edf2f7; text-align: center; }
@@ -35,13 +41,15 @@ td:last-child { border-right: none; }
 .counter-title { font-weight: 700; color: #2d3748; font-size: 14px; text-align: left;}
 .counter-desc { font-size: 12px; color: #a0aec0; margin-top: 4px; text-align: left;}
 
-/* Schedule Card */
+/* Schedule Card ในตาราง */
 .schedule-card { background: #e6fffa; border-left: 4px solid #319795; padding: 8px 10px; border-radius: 6px; margin-bottom: 5px; cursor: pointer; transition: 0.2s; }
 .schedule-card:hover { background: #b2f5ea; }
 .sch-time { font-weight: 700; color: #2c7a7b; font-size: 12px; }
 .sch-name { color: #234e52; font-size: 12px; margin-top: 2px; }
 
-/* Modal */
+/* =========================================
+   Modal ทั่วไป
+   ========================================= */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 1000; }
 .modal-content { background: white; width: 100%; max-width: 600px; border-radius: 15px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; }
@@ -50,13 +58,574 @@ td:last-child { border-right: none; }
 .close-btn { font-size: 24px; cursor: pointer; color: #a0aec0; background: none; border: none; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px; }
 
-.tabs { display: flex; border-bottom: 2px solid #edf2f7; margin-bottom: 25px; justify-content: space-around; }
-.tab { padding: 10px 20px; font-weight: 600; font-size: 14px; color: #718096; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: 0.2s; }
-.tab.active { color: #FFCC00; border-bottom-color: #FFCC00; }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-
 .form-group { margin-bottom: 20px; }
 .form-label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #4a5568; }
-.form-control { width: 100%; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 14px; outline: none; font-family: 'Sarabun', sans-serif; }
+.form-control { width: 100%; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 14px; outline: none; font-family: 'Sarabun', sans-serif; background: #fff;}
 .form-control:focus { border-color: #FFCC00; }
+
+/* =========================================
+   Modal จัดการตาราง (3 แท็บ ตาม Figma)
+   ========================================= */
+.modal-tabs-header { 
+    display: flex; 
+    gap: 20px; 
+    border-bottom: 2px solid #edf2f7; 
+    margin-bottom: 20px; 
+}
+.m-tab { 
+    padding-bottom: 10px; 
+    font-weight: 600; 
+    color: #718096; 
+    cursor: pointer; 
+    border-bottom: 3px solid transparent; 
+    transition: 0.3s; 
+}
+.m-tab.active { 
+    color: #FFCC00; 
+    border-bottom-color: #FFCC00; 
+}
+.m-tab-content { display: none; }
+.m-tab-content.active { display: block; }
+
+/* การ์ดพนักงานหลัก (Tab 1) */
+.primary-staff-card { 
+    border: 1px solid #FFCC00; 
+    border-radius: 8px; 
+    padding: 15px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    background: #FFFAEB; 
+    margin-bottom: 20px; 
+}
+
+/* ปุ่มลบสีแดง (Tab 1) */
+.btn-danger { 
+    background: #fff5f5; 
+    color: #e53e3e; 
+    border: 1px solid #feb2b2; 
+    padding: 10px 15px; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    width: 100%; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-top: 20px;
+}
+.btn-danger:hover { background: #fed7d7; }
+
+/* =========================================
+   ระบบ คนแทน/ลาป่วย (Tab 2)
+   ========================================= */
+.sick-alert-box { 
+    background: #fff5f5; 
+    border: 1px solid #feb2b2; 
+    padding: 20px; 
+    border-radius: 8px; 
+    margin-bottom: 20px; 
+}
+.btn-toggle-sick { 
+    background: #fff5f5; 
+    color: #e53e3e; 
+    border: 1px solid #fc8181; 
+    padding: 10px; 
+    width: 100%; 
+    border-radius: 6px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    transition: 0.2s; 
+    text-align: center; 
+}
+.btn-toggle-sick:hover { background: #fed7d7; }
+.btn-toggle-sick.active { 
+    background: #e53e3e; 
+    color: white; 
+    border-color: #e53e3e; 
+}
+
+/* กล่องรายชื่อคนแทน */
+.substitute-card { 
+    background: #faf5ff; 
+    border: 1px solid #e9d8fd; 
+    padding: 15px; 
+    border-radius: 8px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 10px; 
+}
+.sub-name { font-weight: 700; color: #1a202c; font-size: 14px; }
+.sub-time { font-size: 12px; color: #805ad5; margin-top: 4px; font-weight: 600; }
+.btn-remove-sub { 
+    background: white; 
+    border: 1px solid #e2e8f0; 
+    border-radius: 4px; 
+    width: 28px; 
+    height: 28px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    cursor: pointer; 
+    color: #a0aec0; 
+}
+.btn-remove-sub:hover { background: #edf2f7; color: #e53e3e; }
+
+/* =========================================
+   ระบบ คนแทน/ลาป่วย (Tab 2) - Figma Update
+   ========================================= */
+.sick-alert-box { 
+    background: #fff5f5; 
+    border: 1px solid #feb2b2; 
+    padding: 20px; 
+    border-radius: 8px; 
+    margin-bottom: 25px; 
+}
+.btn-toggle-sick { 
+    background: #fff5f5; 
+    color: #e53e3e; 
+    border: 1px solid #fc8181; 
+    padding: 12px; 
+    width: 100%; 
+    border-radius: 6px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    transition: 0.2s; 
+    text-align: center; 
+    font-size: 14px;
+}
+.btn-toggle-sick:hover { background: #fed7d7; }
+.btn-toggle-sick.active { 
+    background: #e53e3e; 
+    color: white; 
+    border-color: #e53e3e; 
+}
+
+/* กล่องรายชื่อคนแทน (สีม่วงอ่อนแบบ Figma) */
+.substitute-card { 
+    background: #faf5ff; 
+    border: 1px solid #d6bcfa; 
+    padding: 15px; 
+    border-radius: 8px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 12px; 
+}
+.sub-name { font-weight: 700; color: #1a202c; font-size: 14px; }
+.sub-time { font-size: 12px; color: #6b46c1; margin-top: 4px; font-weight: 600; }
+.btn-remove-sub { 
+    background: white; 
+    border: 1px solid #e2e8f0; 
+    border-radius: 4px; 
+    width: 28px; 
+    height: 28px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    cursor: pointer; 
+    color: #a0aec0; 
+    transition: 0.2s;
+}
+.btn-remove-sub:hover { background: #edf2f7; color: #e53e3e; }
+
+/* กล่องเตือนผลการประเมิน (สีฟ้าแบบ Figma) */
+.eval-alert { 
+    background: #ebf8ff; 
+    border: 1px solid #bee3f8; 
+    padding: 15px; 
+    border-radius: 8px; 
+    margin-bottom: 20px; 
+    margin-top: 20px;
+}
+.eval-alert-title { color: #2b6cb0; font-weight: 700; font-size: 13px; margin-bottom: 5px; }
+.eval-alert-desc { color: #3182ce; font-size: 12px; line-height: 1.6; }
+
+/* เส้นคั่น */
+.dashed-divider {
+    border-top: 1px dashed #cbd5e0; 
+    margin: 25px 0;
+}
+/* กล่องแนะนำคนแทน (Figma Update) */
+.suggested-sub-card {
+    background: #faf5ff;
+    border: 1px solid #d6bcfa;
+    padding: 12px 15px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.btn-call-sub {
+    background: #8b5cf6;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
+}
+.btn-call-sub:hover { background: #7c3aed; }
+/* =========================================
+   Add Schedule Modal (Multi-step Figma)
+   ========================================= */
+.stepper-container {
+    display: flex;
+    justify-content: space-between;
+    background: #f7fafc;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 25px;
+}
+.step-item {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #a0aec0;
+    padding: 10px 0;
+    border-radius: 6px;
+    transition: 0.3s;
+}
+.step-item.active {
+    background: #FFCC00;
+    color: #000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.step-content { display: none; }
+.step-content.active { display: block; }
+
+/* Radio Button แบบการ์ด (Step 1) */
+.radio-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+.radio-card {
+    border: 1px solid #cbd5e0;
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: 0.2s;
+}
+.radio-card:hover { border-color: #a0aec0; background: #f7fafc; }
+.radio-card input[type="radio"] {
+    accent-color: #FFCC00;
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+}
+
+/* ปุ่มเลือกวันจันทร์-อาทิตย์ (Step 2) */
+.day-selector {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.day-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    border: 1px solid #cbd5e0;
+    background: #fff;
+    color: #4a5568;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.day-btn.active {
+    background: #FFCC00;
+    border-color: #FFCC00;
+    color: #000;
+}
+
+/* กล่องสรุปข้อมูล (Step 3) */
+.summary-box {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.summary-item .label { font-size: 12px; color: #a0aec0; }
+.summary-item .value { font-size: 14px; font-weight: 700; color: #1a202c; margin-top: 2px; }
+
+/* สไตล์แถบ Multi-step (เหลืองเฉพาะหน้าที่กำลังใช้งานอยู่) */
+        .stepper-container { display: flex; background: #f7fafc; border-radius: 8px; margin-bottom: 25px; padding: 5px; gap: 5px; }
+        .step-item { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: #a0aec0; background: #edf2f7; padding: 12px 0; border-radius: 6px; transition: 0.3s; }
+        .step-item.active { background: #FFCC00; color: #000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .day-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid #cbd5e0; background: #fff; color: #4a5568; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; user-select: none; }
+        .day-btn.active { background: #FFCC00; border-color: #FFCC00; color: #000; }
+
+ .stepper-container { display: flex; background: #f7fafc; border-radius: 8px; margin-bottom: 25px; padding: 5px; gap: 5px; }
+        .step-item { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: #a0aec0; background: #edf2f7; padding: 12px 0; border-radius: 6px; transition: 0.3s; }
+        .step-item.active { background: #FFCC00; color: #000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .day-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid #cbd5e0; background: #fff; color: #4a5568; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; user-select: none; }
+        .day-btn.active { background: #FFCC00; border-color: #FFCC00; color: #000; }
+        .sub-counter-list { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        .history-list { padding: 10px 5px; }
+        .h-item { display: flex; gap: 15px; margin-bottom: 25px; position: relative; }
+        .h-item:not(:last-child)::after { content: ''; position: absolute; left: 6px; top: 20px; bottom: -25px; width: 2px; background: #e2e8f0; }
+        .h-dot { width: 14px; height: 14px; border-radius: 50%; background: #cbd5e0; z-index: 1; margin-top: 4px; }
+        .h-dot.create { background: #48bb78; }
+        .h-dot.update { background: #ecc94b; }
+        .h-dot.sub { background: #9f7aea; }
+        .h-time { font-size: 11px; color: #a0aec0; margin-bottom: 3px; font-weight: 500;}
+        .h-text { font-size: 13px; color: #2d3748; font-weight: 600; }
+
+        /* สไตล์ปุ่มสลับมุมมอง รายสัปดาห์ / รายเคาน์เตอร์ ตาม Figma */
+        .view-toggle-group { display: flex; gap: 8px; }
+        .btn-view-toggle { background: #fff; border: 1px solid #cbd5e0; padding: 7px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; color: #4a5568; cursor: pointer; transition: 0.2s; }
+        .btn-view-toggle:hover { background: #f7fafc; border-color: #a0aec0; }
+        .btn-view-toggle.active { background: #edf2f7; color: #1a202c; border-color: #cbd5e0; }
+
+        /* สไตล์การ์ดเคาน์เตอร์ใน Modal รายเคาน์เตอร์ */
+        .counter-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px; }
+        .counter-item-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; cursor: pointer; transition: 0.2s; background: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .counter-item-card:hover { border-color: #FFCC00; background: #fffdf5; box-shadow: 0 4px 6px rgba(0,0,0,0.04); }
+        .counter-badge { background: #edf2f7; color: #4a5568; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
+        
+        .subcounter-detail-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 12px; background: #f8fafc; }
+        .subcounter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #cbd5e0; }
+        .sub-sch-tag { display: inline-block; background: #e6fffa; border: 1px solid #b2f5ea; color: #234e52; font-size: 12px; padding: 4px 10px; border-radius: 6px; margin: 3px 4px 3px 0; font-weight: 500; }
+
+        /* =========================================
+   1. จัดแถบสัปดาห์และดันปุ่ม "รายเคาน์เตอร์" ไปฝั่งขวาสุด
+   ========================================= */
+.toolbar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.week-nav-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.week-label {
+    font-weight: 600;
+    font-size: 16px;
+    padding: 0 10px;
+}
+
+.view-toggle-group {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.btn-view-toggle {
+    background: #fff;
+    border: 1px solid #cbd5e0;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #4a5568;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-view-toggle:hover {
+    background: #f7fafc;
+    border-color: #a0aec0;
+}
+
+/* =========================================
+   2. กล่องแจ้งเตือน Conflict, คำใบ้ และปุ่ม Disabled
+   ========================================= */
+.conflict-alert-box {
+    display: none;
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+    border-radius: 8px;
+    padding: 12px 15px;
+    margin-top: 10px;
+    color: #c53030;
+    font-size: 13px;
+    line-height: 1.5;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.conflict-alert-box i {
+    color: #e53e3e;
+    margin-top: 3px;
+    font-size: 14px;
+}
+
+.conflict-bottom-banner {
+    display: none;
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+    border-radius: 8px;
+    padding: 12px 15px;
+    margin-top: 18px;
+    color: #c53030;
+    font-size: 13px;
+    font-weight: 700;
+    align-items: center;
+    gap: 10px;
+}
+
+.conflict-bottom-banner i {
+    color: #e53e3e;
+}
+
+.field-hint {
+    font-size: 12px;
+    color: #718096;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-yellow:disabled {
+    background: #edf2f7 !important;
+    color: #a0aec0 !important;
+    cursor: not-allowed !important;
+    opacity: 0.7;
+    box-shadow: none !important;
+}
+
+/* =========================================
+   3. สไตล์ของ Modal รายเคาน์เตอร์ & Subcounter
+   ========================================= */
+.counter-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.counter-item-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: 0.2s;
+    background: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.counter-item-card:hover {
+    border-color: #FFCC00;
+    background: #fffdf5;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+}
+
+.counter-badge {
+    background: #edf2f7;
+    color: #4a5568;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.subcounter-detail-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background: #f8fafc;
+}
+
+.subcounter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #cbd5e0;
+}
+
+.sub-sch-tag {
+    display: inline-block;
+    background: #e6fffa;
+    border: 1px solid #b2f5ea;
+    color: #234e52;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin: 3px 4px 3px 0;
+    font-weight: 500;
+}
+
+/* =========================================
+   4. แถบสัญลักษณ์สี (Status Legend) & สีการ์ดตามสถานะจริง
+   ========================================= */
+.status-legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 15px;
+    font-size: 12px;
+    color: #4a5568;
+    align-items: center;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.legend-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.legend-box.checkin { background: #e6fffa; border: 1px solid #38b2ac; }
+.legend-box.waiting { background: #ebf8ff; border: 1px solid #4299e1; }
+.legend-box.sick    { background: #fff5f5; border: 1px solid #fc8181; }
+.legend-box.sub     { background: #faf5ff; border: 1px solid #9f7aea; }
+.legend-box.close   { background: #edf2f7; border: 1px solid #a0aec0; }
+
+/* สีการ์ดบนตารางหลักตามสถานะ Backend */
+.schedule-card.checkin-card {
+    background: #e6fffa;
+    border-left: 4px solid #38b2ac;
+}
+.schedule-card.waiting-card {
+    background: #ebf8ff;
+    border-left: 4px solid #4299e1;
+}
+.schedule-card.sick-card {
+    background: #fff5f5;
+    border-left: 4px solid #fc8181;
+}
+.schedule-card.sub-card {
+    background: #faf5ff;
+    border-left: 4px solid #9f7aea;
+}
+.schedule-card.close-card {
+    background: #edf2f7;
+    border-left: 4px solid #a0aec0;
+}
+
+.sch-time.waiting-text { color: #2b6cb0; }
+.sch-time.close-text   { color: #718096; }

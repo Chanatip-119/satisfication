@@ -1,0 +1,235 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+* {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Sarabun', sans-serif;
+        }
+
+        body {
+            background-color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 450px;
+            padding: 40px;
+        }
+
+        /* ปรับโลโก้ให้ชิดซ้ายและเรียงแนวนอนตามดีไซน์ */
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+
+        /* ตราวงกลมมหาวิทยาลัยบูรพา */
+        .logo-container .logo-seal {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%; /* ตัดมุมพื้นหลังสีดำออกให้เป็นวงกลม */
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-logo img {
+            width: 54px;
+            height: 54px;
+            object-fit: cover;
+        }
+
+        /* ข้อความ BUU และ BURAPHA UNIVERSITY ด้านข้างตรา */
+        .logo-text-group {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .logo-buu {
+            font-size: 40px;
+            font-weight: 800;
+            line-height: 0.9;
+            letter-spacing: 0.5px;
+        }
+
+        .logo-buu .char-b {
+            color: #ffcc00;
+        }
+
+        .logo-buu .char-uu {
+            color: #64748b;
+        }
+
+        .logo-sub {
+            font-size: 9.5px;
+            font-weight: 800;
+            color: #1a202c;
+            letter-spacing: 0.4px;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+
+        /* กรณีต้องการใช้ไฟล์รูปภาพโลโก้ตัวอักษร BUU แทน CSS Text */
+        .logo-container .logo-wordmark {
+            height: 48px;
+            width: auto;
+        }
+
+        /* ปรับหัวข้อ "เข้าสู่ระบบ" ให้ชิดซ้ายตามภาพออกแบบ */
+        .login-header {
+            text-align: left;
+            margin-bottom: 32px;
+        }
+
+        .login-header h1 {
+            color: #1a202c;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            color: #718096;
+            font-size: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #2d3748;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group .icon-left {
+            position: absolute;
+            left: 15px;
+            color: #a0aec0;
+            width: 20px;
+            height: 20px;
+        }
+
+        .input-group .icon-right {
+            position: absolute;
+            right: 15px;
+            color: #a0aec0;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px 12px 45px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            color: #2d3748;
+            outline: none;
+            transition: all 0.2s;
+            background-color: #f8fafc;
+        }
+
+        .input-group input:focus {
+            border-color: #ffcc00;
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.1);
+        }
+
+        .input-group input::placeholder {
+            color: #a0aec0;
+        }
+
+        .form-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .checkbox-group input {
+            display: none;
+        }
+
+        .checkmark {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 4px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .checkbox-group input:checked + .checkmark {
+            background-color: #ffcc00;
+            border-color: #ffcc00;
+        }
+
+        .checkmark svg {
+            display: none;
+            color: #ffffff;
+            width: 12px;
+            height: 12px;
+        }
+
+        .checkbox-group input:checked + .checkmark svg {
+            display: block;
+        }
+
+        .checkbox-group span {
+            color: #4a5568;
+        }
+
+        .forgot-password {
+            color: #ecc94b;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .forgot-password:hover {
+            color: #d69e2e;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background-color: #ffcc00;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-login:hover {
+            background-color: #ecc94b;
+        }

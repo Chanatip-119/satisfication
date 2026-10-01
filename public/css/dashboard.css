@@ -1,0 +1,370 @@
+/* =========================================
+   Dashboard Specific Styles
+   (ใช้โครงสร้าง Sidebar, Body, Buttons ร่วมกับ schedule.css 100%)
+   ========================================= */
+
+.period-select-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #cbd5e0;
+    border-radius: 8px;
+    padding: 7px 14px;
+    gap: 8px;
+    transition: 0.2s;
+}
+
+.period-select-wrapper:hover {
+    border-color: #a0aec0;
+    background: #f7fafc;
+}
+
+.period-select {
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a5568;
+    outline: none;
+    cursor: pointer;
+}
+
+/* =========================================
+   Top 4 Summary KPI Cards
+   ========================================= */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 22px;
+}
+
+.kpi-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 22px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.kpi-label {
+    font-size: 13px;
+    color: #718096;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.kpi-value {
+    font-size: 32px;
+    font-weight: 700;
+    font-style: italic;
+    color: #1a202c;
+    line-height: 1.1;
+}
+
+/* =========================================
+   Main Dashboard 2-Column Layout
+   ========================================= */
+.dashboard-main-grid {
+    display: grid;
+    grid-template-columns: 2.3fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.left-col,
+.right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.panel-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.panel-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.panel-subtitle {
+    font-size: 12px;
+    color: #718096;
+    font-weight: 500;
+}
+
+/* =========================================
+   Current Counter Status Table
+   ========================================= */
+.status-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+.status-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: #718096;
+    padding: 10px 8px;
+    border-bottom: 1px solid #edf2f7;
+    text-transform: uppercase;
+}
+
+.status-table td {
+    padding: 12px 8px;
+    font-size: 13px;
+    border-bottom: 1px solid #f7fafc;
+    border-right: none;
+    vertical-align: middle;
+    min-height: auto;
+}
+
+.status-table td:first-child {
+    border-right: none;
+}
+
+.counter-code-bold {
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.counter-floor-sub {
+    font-size: 11px;
+    color: #718096;
+    margin-left: 4px;
+}
+
+.staff-empty {
+    color: #a0aec0;
+    font-weight: 400;
+}
+
+.score-pill {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    min-width: 44px;
+}
+
+.score-high { background: #e6fffa; color: #047857; }
+.score-mid  { background: #fef3c7; color: #b45309; }
+.score-low  { background: #fee2e2; color: #dc2626; }
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.status-pill.active    { background: #dcfce7; color: #15803d; }
+.status-pill.available { background: #fef3c7; color: #b45309; }
+.status-pill.close     { background: #e2e8f0; color: #475569; }
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* =========================================
+   Score Distribution & Check-in List
+   ========================================= */
+.star-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
+.star-emoji {
+    font-size: 16px;
+    width: 22px;
+    text-align: center;
+}
+
+.star-label {
+    width: 35px;
+    color: #4a5568;
+    font-weight: 500;
+}
+
+.star-bar-bg {
+    flex: 1;
+    height: 7px;
+    background: #edf2f7;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.star-bar-fill {
+    height: 100%;
+    border-radius: 10px;
+}
+
+.star-bar-5 { background: #10b981; }
+.star-bar-4 { background: #84cc16; }
+.star-bar-3 { background: #f59e0b; }
+.star-bar-2 { background: #f97316; }
+.star-bar-1 { background: #ef4444; }
+
+.star-count {
+    width: 28px;
+    text-align: right;
+    font-weight: 600;
+    color: #4a5568;
+}
+
+.checkin-list-section {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid #edf2f7;
+}
+
+.checkin-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f7fafc;
+}
+
+.checkin-item:last-child {
+    border-bottom: none;
+}
+
+.checkin-staff-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.checkin-meta {
+    font-size: 11px;
+    color: #718096;
+    margin-top: 2px;
+}
+
+/* =========================================
+   Highest & Needs Improvement Card
+   ========================================= */
+.perf-group {
+    padding: 10px 0;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.perf-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.perf-tag {
+    font-size: 11px;
+    color: #718096;
+    margin-bottom: 6px;
+}
+
+.perf-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.score-badge-lg {
+    padding: 6px 14px;
+    border-radius: 18px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* =========================================
+   Bottom Row (Counter Average & Recent Comments)
+   ========================================= */
+.dashboard-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 18px;
+}
+
+.counter-avg-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.counter-avg-name {
+    width: 90px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.counter-avg-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: #edf2f7;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.counter-avg-bar-fill {
+    height: 100%;
+    background: #10b981;
+    border-radius: 10px;
+}
+
+.counter-avg-val {
+    width: 32px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+.comment-item {
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.comment-text {
+    font-size: 13px;
+    color: #2d3748;
+}
+
