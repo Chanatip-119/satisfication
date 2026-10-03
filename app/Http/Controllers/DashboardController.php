@@ -96,14 +96,18 @@ class DashboardController extends Controller
         $newCommentsCount = $newCommentsList->count();
 
         // ==========================================
-        // 3. กราฟแนวโน้มคะแนนรายวัน 7 วันล่าสุด
+        // 3. กราฟแนวโน้มคะแนนรายวัน 7 วันล่าสุด (แสดงวัน + เดือนทุกช่อง เช่น 27 Sep, 28 Sep)
         // ==========================================
         $trendLabels = [];
         $trendScores = [];
         for ($i = 6; $i >= 0; $i--) {
             $d = $today->copy()->subDays($i);
             $dStr = $d->format('Y-m-d');
-            $trendLabels[] = $i === 0 ? 'วันนี้' : ($i === 6 ? $d->translatedFormat('j M') : $d->format('j'));
+            
+            // แสดงวันและเดือนทุกช่อง (เช่น 27 Sep, 28 Sep, ..., 3 Oct (วันนี้))
+            $trendLabels[] = $i === 0 
+                ? $d->translatedFormat('j M') . ' (วันนี้)' 
+                : $d->translatedFormat('j M');
 
             $dayEvals = $allEvals->filter(function ($e) use ($dateCol, $dStr) {
                 if (empty($e->{$dateCol})) return false;

@@ -4,15 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>แดชบอร์ด — ระบบประเมินความพึงพอใจ</title>
-    <!-- โหลด schedule.css เป็นฐานเพื่อให้ Sidebar, สี และฟอนต์ตรงกับหน้าอื่น 100% -->
     <link rel="stylesheet" href="{{ asset('css/schedule.css') }}?v={{ time() }}">
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ time() }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .sidebar {
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100vh !important;
+        }
+        .logout-btn {
+            margin-top: auto !important;
+            color: #fff !important;
+            text-decoration: none !important;
+            padding: 14px 16px 6px 16px !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+        }
+        .logout-btn:hover { opacity: 0.85; }
+    </style>
 </head>
 <body>
 
-    <!-- Sidebar (ใช้โครงสร้างและคลาสเดียวกับหน้าตารางปฏิบัติงาน) -->
+    <!-- Sidebar พร้อมปุ่ม Logout ด้านล่างสุด -->
     <div class="sidebar">
         <div class="sidebar-logo">
             <img src="{{ asset('images/Buu-logo11.png') }}" alt="Logo">
@@ -28,7 +47,7 @@
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
-        <a href="{{ url('/') }}" class="logout-btn"></i>↩ Logout</a>
+        <a href="{{ url('/logout') }}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
     </div>
 
     <!-- Main Content -->
@@ -81,7 +100,6 @@
         <div class="dashboard-main-grid">
             <!-- Left Column -->
             <div class="left-col">
-                <!-- กราฟแนวโน้มคะแนนรายวัน 7 วันล่าสุด -->
                 <div class="panel-card">
                     <div class="panel-header">
                         <div class="panel-title">แนวโน้มคะแนนรายวัน 7 วันล่าสุด</div>
@@ -92,7 +110,6 @@
                     </div>
                 </div>
 
-                <!-- ตารางสถานะเคาน์เตอร์ทั้งหมด ณ ปัจจุบัน -->
                 <div class="panel-card">
                     <div class="panel-header">
                         <div class="panel-title">สถานะเคาน์เตอร์ทั้งหมด ณ ปัจจุบัน</div>
@@ -157,7 +174,6 @@
 
             <!-- Right Column -->
             <div class="right-col">
-                <!-- การกระจายคะแนน & Staff ที่กำลัง Check-in -->
                 <div class="panel-card">
                     <div class="panel-header">
                         <div class="panel-title">การกระจายคะแนน</div>
@@ -180,7 +196,6 @@
                         </div>
                     <?php endforeach; ?>
 
-                    <!-- Staff ที่กำลัง Check-in -->
                     <div class="checkin-list-section">
                         <div class="panel-title" style="margin-bottom: 10px;">Staff ที่กำลัง Check-in</div>
                         <?php if(count($activeCheckinStaffs) > 0): ?>
@@ -199,7 +214,6 @@
                     </div>
                 </div>
 
-                <!-- คะแนนสูง & ต้องปรับปรุง -->
                 <div class="panel-card">
                     <div class="panel-header" style="margin-bottom: 8px;">
                         <div class="panel-title">คะแนนสูง & ต้องปรับปรุง</div>
@@ -238,9 +252,8 @@
             </div>
         </div>
 
-        <!-- Bottom Grid: คะแนนเฉลี่ยรายเคาน์เตอร์ & ความคิดเห็นล่าสุด -->
+        <!-- Bottom Grid -->
         <div class="dashboard-bottom-grid">
-            <!-- คะแนนเฉลี่ยรายเคาน์เตอร์ -->
             <div class="panel-card">
                 <div class="panel-header">
                     <div class="panel-title">คะแนนเฉลี่ยรายเคาน์เตอร์</div>
@@ -258,7 +271,6 @@
                 <?php endforeach; ?>
             </div>
 
-            <!-- ความคิดเห็นล่าสุด -->
             <div class="panel-card">
                 <div class="panel-header">
                     <div class="panel-title">ความคิดเห็นล่าสุด</div>
@@ -330,7 +342,8 @@
                         min: 0,
                         max: 5,
                         ticks: {
-                            stepSize: 1.5,
+                            stepSize: 1,
+                            precision: 0,
                             color: '#a0aec0',
                             font: { family: 'Prompt', size: 11 }
                         },
