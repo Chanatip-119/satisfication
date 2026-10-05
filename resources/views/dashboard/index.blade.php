@@ -11,7 +11,7 @@
 </head>
 <body>
 
-    <!-- Sidebar พร้อมปุ่ม Logout ด้านล่างสุด -->
+    <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-logo">
             <img src="{{ asset('images/Buu-logo11.png') }}" alt="Logo">
@@ -39,9 +39,9 @@
                 <p>Manage and resolve support tickets</p>
             </div>
             <div class="action-buttons">
-                <form action="{{ url('/dashboard') }}" method="GET" id="periodForm" style="margin: 0;">
+                <form action="{{ url('/dashboard') }}" method="GET" id="periodForm" class="period-form">
                     <div class="period-select-wrapper">
-                        <i class="far fa-calendar-alt" style="color: #4a5568; font-size: 13px;"></i>
+                        <i class="far fa-calendar-alt period-icon"></i>
                         <select name="period" class="period-select" onchange="document.getElementById('periodForm').submit()">
                             <option value="today" {{ $period == 'today' ? 'selected' : '' }}>วันนี้</option>
                             <option value="week" {{ $period == 'week' ? 'selected' : '' }}>7 วันล่าสุด</option>
@@ -50,7 +50,7 @@
                         </select>
                     </div>
                 </form>
-                <a href="{{ route('report.export.index') }}" class="btn btn-yellow" style="text-decoration: none;">
+                <a href="{{ route('report.export.index') }}" class="btn btn-yellow btn-export-link">
                     <i class="fas fa-download"></i> Export
                 </a>
             </div>
@@ -85,7 +85,7 @@
                         <div class="panel-title">แนวโน้มคะแนนรายวัน 7 วันล่าสุด</div>
                         <div class="panel-subtitle">เฉลี่ยทุกเคาน์เตอร์</div>
                     </div>
-                    <div style="height: 210px; position: relative;">
+                    <div class="chart-container">
                         <canvas id="trendChart"></canvas>
                     </div>
                 </div>
@@ -94,61 +94,63 @@
                     <div class="panel-header">
                         <div class="panel-title">สถานะเคาน์เตอร์ทั้งหมด ณ ปัจจุบัน</div>
                     </div>
-                    <table class="status-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 18%;">COUNTER</th>
-                                <th style="width: 26%;">STAFF ปัจจุบัน</th>
-                                <th style="width: 18%;">เวลา</th>
-                                <th style="width: 14%; text-align: center;">คะแนนวันนี้</th>
-                                <th style="width: 10%; text-align: center;">ประเมิน</th>
-                                <th style="width: 14%; text-align: right;">สถานะ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($counterStatusRows as $row): ?>
+                    <div class="table-responsive-wrapper">
+                        <table class="status-table">
+                            <thead>
                                 <tr>
-                                    <td>
-                                        <span class="counter-code-bold">{{ $row['counter_code'] }}</span>
-                                        <span class="counter-floor-sub">{{ $row['location'] }}</span>
-                                    </td>
-                                    <td>
-                                        <?php if($row['staff_name']): ?>
-                                            <span style="font-weight: 700; color: #1a202c;">{{ $row['staff_name'] }}</span>
-                                        <?php else: ?>
-                                            <span class="staff-empty">— ไม่มี Staff</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td style="color: #4a5568;">{{ $row['time_range'] }}</td>
-                                    <td style="text-align: center;">
-                                        <?php if($row['score'] !== null): ?>
-                                            <?php
-                                                $sClass = 'score-high';
-                                                if ($row['score'] < 3.0) $sClass = 'score-low';
-                                                elseif ($row['score'] < 4.0) $sClass = 'score-mid';
-                                            ?>
-                                            <span class="score-pill {{ $sClass }}">{{ number_format($row['score'], 1) }}</span>
-                                        <?php else: ?>
-                                            <span style="color: #a0aec0;">—</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td style="text-align: center; font-weight: 700;">{{ $row['eval_count'] }}</td>
-                                    <td style="text-align: right;">
-                                        <?php $stLower = strtolower($row['status']); ?>
-                                        <span class="status-pill {{ $stLower }}">
-                                            <span class="status-dot"></span> {{ $row['status'] }}
-                                        </span>
-                                    </td>
+                                    <th class="col-counter">COUNTER</th>
+                                    <th class="col-staff">STAFF ปัจจุบัน</th>
+                                    <th class="col-time">เวลา</th>
+                                    <th class="col-score">คะแนนวันนี้</th>
+                                    <th class="col-eval">ประเมิน</th>
+                                    <th class="col-status">สถานะ</th>
                                 </tr>
-                            <?php endforeach; ?>
+                            </thead>
+                            <tbody>
+                                <?php foreach($counterStatusRows as $row): ?>
+                                    <tr>
+                                        <td>
+                                            <span class="counter-code-bold">{{ $row['counter_code'] }}</span>
+                                            <span class="counter-floor-sub">{{ $row['location'] }}</span>
+                                        </td>
+                                        <td>
+                                            <?php if($row['staff_name']): ?>
+                                                <span class="staff-name-bold">{{ $row['staff_name'] }}</span>
+                                            <?php else: ?>
+                                                <span class="staff-empty">— ไม่มี Staff</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="time-cell">{{ $row['time_range'] }}</td>
+                                        <td class="text-center">
+                                            <?php if($row['score'] !== null): ?>
+                                                <?php
+                                                    $sClass = 'score-high';
+                                                    if ($row['score'] < 3.0) $sClass = 'score-low';
+                                                    elseif ($row['score'] < 4.0) $sClass = 'score-mid';
+                                                ?>
+                                                <span class="score-pill {{ $sClass }}">{{ number_format($row['score'], 1) }}</span>
+                                            <?php else: ?>
+                                                <span class="text-muted">—</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="eval-count-cell">{{ $row['eval_count'] }}</td>
+                                        <td class="text-right">
+                                            <?php $stLower = strtolower($row['status']); ?>
+                                            <span class="status-pill {{ $stLower }}">
+                                                <span class="status-dot"></span> {{ $row['status'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
 
-                            <?php if(count($counterStatusRows) === 0): ?>
-                                <tr>
-                                    <td colspan="6" style="text-align: center; color: #a0aec0; padding: 25px;">ยังไม่มีข้อมูลเคาน์เตอร์ในระบบ</td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                                <?php if(count($counterStatusRows) === 0): ?>
+                                    <tr>
+                                        <td colspan="6" class="empty-table-msg">ยังไม่มีข้อมูลเคาน์เตอร์ในระบบ</td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -177,7 +179,7 @@
                     <?php endforeach; ?>
 
                     <div class="checkin-list-section">
-                        <div class="panel-title" style="margin-bottom: 10px;">Staff ที่กำลัง Check-in</div>
+                        <div class="panel-title checkin-title">Staff ที่กำลัง Check-in</div>
                         <?php if(count($activeCheckinStaffs) > 0): ?>
                             <?php foreach($activeCheckinStaffs as $act): ?>
                                 <div class="checkin-item">
@@ -189,13 +191,13 @@
                                 </div>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <div style="font-size: 12px; color: #a0aec0; padding: 10px 0;">ยังไม่มีบุคลากรที่กำลัง Check-in ในขณะนี้</div>
+                            <div class="empty-sub-msg">ยังไม่มีบุคลากรที่กำลัง Check-in ในขณะนี้</div>
                         <?php endif; ?>
                     </div>
                 </div>
 
                 <div class="panel-card">
-                    <div class="panel-header" style="margin-bottom: 8px;">
+                    <div class="panel-header panel-header-compact">
                         <div class="panel-title">คะแนนสูง & ต้องปรับปรุง</div>
                     </div>
 
@@ -204,28 +206,28 @@
                         <?php if($highestStaff): ?>
                             <div class="perf-row">
                                 <div>
-                                    <div style="font-weight: 700; font-size: 14px; color: #1a202c;">{{ $highestStaff['name'] }}</div>
-                                    <div style="font-size: 12px; color: #718096; margin-top: 2px;">เคาน์เตอร์ {{ $highestStaff['counter_code'] }}</div>
+                                    <div class="perf-staff-name">{{ $highestStaff['name'] }}</div>
+                                    <div class="perf-staff-meta">เคาน์เตอร์ {{ $highestStaff['counter_code'] }}</div>
                                 </div>
                                 <span class="score-badge-lg score-high">{{ number_format($highestStaff['avg_score'], 1) }}</span>
                             </div>
                         <?php else: ?>
-                            <div style="font-size: 12px; color: #a0aec0;">ยังไม่มีข้อมูลคะแนนประเมิน</div>
+                            <div class="empty-sub-msg">ยังไม่มีข้อมูลคะแนนประเมิน</div>
                         <?php endif; ?>
                     </div>
 
-                    <div class="perf-group" style="padding-top: 14px;">
+                    <div class="perf-group perf-group-spaced">
                         <div class="perf-tag">ต้องปรับปรุง</div>
                         <?php if($lowestStaff): ?>
                             <div class="perf-row">
                                 <div>
-                                    <div style="font-weight: 700; font-size: 14px; color: #1a202c;">{{ $lowestStaff['name'] }}</div>
-                                    <div style="font-size: 12px; color: #718096; margin-top: 2px;">เคาน์เตอร์ {{ $lowestStaff['counter_code'] }}</div>
+                                    <div class="perf-staff-name">{{ $lowestStaff['name'] }}</div>
+                                    <div class="perf-staff-meta">เคาน์เตอร์ {{ $lowestStaff['counter_code'] }}</div>
                                 </div>
                                 <span class="score-badge-lg score-low">{{ number_format($lowestStaff['avg_score'], 1) }}</span>
                             </div>
                         <?php else: ?>
-                            <div style="font-size: 12px; color: #a0aec0;">ยังไม่มีข้อมูลเปรียบเทียบ</div>
+                            <div class="empty-sub-msg">ยังไม่มีข้อมูลเปรียบเทียบ</div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -261,19 +263,19 @@
                     <?php foreach($recentComments as $cmt): ?>
                         <div class="comment-item">
                             <div class="comment-header">
-                                <span style="font-weight: 700; color: #2b6cb0;">
+                                <span class="comment-author">
                                     {{ $cmt['counter_code'] }} {{ $cmt['staff_name'] ? '• ' . $cmt['staff_name'] : '' }}
                                 </span>
-                                <span style="color: #d69e2e; font-weight: 700;">
+                                <span class="comment-rating">
                                     <i class="fas fa-star"></i> {{ number_format($cmt['score'], 1) }}
-                                    <span style="color: #a0aec0; font-weight: 400; margin-left: 6px;">{{ $cmt['time'] }}</span>
+                                    <span class="comment-time">{{ $cmt['time'] }}</span>
                                 </span>
                             </div>
                             <div class="comment-text">{{ $cmt['comment'] }}</div>
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <div style="text-align: center; color: #a0aec0; font-size: 13px; padding: 30px 0;">
+                    <div class="empty-comments-msg">
                         ยังไม่มีความคิดเห็นในระบบ
                     </div>
                 <?php endif; ?>

@@ -326,5 +326,220 @@
         }
     </script>
     @endif
+
+    <script>
+(function () {
+    // บล็อก /api/my-reviews ของสคริปต์เก่า ไม่ให้พ่นค่า undefined ออกมาทับ
+    const originalFetch = window.fetch;
+    window.fetch = function (url, options) {
+        if (typeof url === 'string' && url.includes('/api/my-reviews')) {
+            return new Promise(() => {}); 
+        }
+        return originalFetch.apply(this, arguments);
+    };
+
+    let currentFilter = 'all'; // 'all' หรือ 'negative'
+
+    function extractReviewCards(rootNode) {
+        let allDivs = Array.from(rootNode.querySelectorAll('div'));
+        return allDivs.filter(div => {
+            let txt = div.innerText || div.textContent || '';
+            let hasStars = txt.includes('★') || txt.includes('☆');
+            let hasTimePattern = /\d{1,2}:\d{2}\s*น\./.test(txt);
+            let childHasBoth = Array.from(div.children).some(ch => {
+                let cTxt = ch.innerText || ch.textContent || '';
+                return (cTxt.includes('★') || cTxt.includes('☆')) && /\d{1,2}:\d{2}\s*น\./.test(cTxt);
+            });
+            return hasStars && hasTimePattern && !childHasBoth;
+        });
+    }
+
+    function syncAndFilterMyReviews(filterMode = currentFilter) {
+        currentFilter = filterMode;
+
+        let allDivs = Array.from(document.querySelectorAll('div'));
+        let reviewCards = extractReviewCards(document);
+
+        let totalCount = reviewCards.length;
+        let sumScore = 0;
+        let negativeCount = 0;
+
+        reviewCards.forEach(card => {
+            let txt = card.innerText || '';
+            let filledStars = (txt.match(/★/g) || []).length;
+            let emptyStars  = (txt.match(/☆/g) || []).length;
+
+            if (emptyStars === 0 && filledStars === 5) {
+                let starSpans = Array.from(card.querySelectorAll('span, i')).filter(s => (s.innerText || '').trim() === '★');
+                if (starSpans.length === 5) {
+                    let activeStars = starSpans.filter(s => {
+                        let c = (s.style.color || window.getComputedStyle(s).color || '').toLowerCase();
+                        return !c.includes('203, 213, 224') && !c.includes('cbd5e0') && !c.includes('ccc') && !c.includes('e2e8f0');
+                    }).length;
+                    if (activeStars > 0) filledStars = activeStars;
+                }
+            }
+
+            let score = filledStars > 0 ? filledStars : 5;
+            let borderStyle = (card.getAttribute('style') || '') + ' ' + window.getComputedStyle(card).borderLeftColor;
+            let isNegative = (score <= 2) || borderStyle.includes('229, 62, 62') || borderStyle.includes('239, 68, 68') || borderStyle.includes('#e53e3e') || borderStyle.includes('#ef4444') || borderStyle.includes('rgb(220, 38, 38)');
+
+            sumScore += score;
+            if (isNegative) negativeCount++;
+
+            card.style.display = (currentFilter === 'negative' && !isNegative) ? 'none' : '';
+        });
+
+        let avgScoreStr = totalCount > 0 ? (sumScore / totalCount).toFixed(1) : '0.0';
+
+        let counterCode = '1.1';
+        let bodyLines = (document.body.innerText || '').split('\n');
+        for (let line of bodyLines) {
+            let m = line.match(/เคาน์เตอร์\s*(\d+\.\d+)/);
+            if (m && m[1]) {
+                counterCode = m[1];
+                break;
+            }
+        }
+
+        // อัปเดตกล่องตัวเลขสรุป 3 ช่องด้านบน
+        allDivs.forEach(el => {
+            if (el.children.length === 0) {
+                let label = (el.innerText || '').trim();
+                let valEl = el.nextElementSibling;
+                if (valEl) {
+                    if (label === 'คะแนนเฉลี่ย') valEl.innerText = avgScoreStr;
+                    else if (label === 'ประเมินทั้งหมด') valEl.innerText = totalCount;
+                    else if (label === 'เชิงลบ') valEl.innerText = negativeCount;
+                }
+            }
+        });
+
+        // อัปเดตปุ่มกดสลับ "ทั้งหมด (X)" และ "เชิงลบ (Y)"
+        let allElements = Array.from(document.querySelectorAll('button, span, div, a'));
+        allElements.forEach(el => {
+            if (el.children.length === 0) {
+                let t = (el.innerText || '').trim();
+                if (/^ทั้งหมด\s*\(.*\)$/.test(t)) {
+                    el.innerText = `ทั้งหมด (${totalCount})`;
+                    el.style.cursor = 'pointer';
+                    el.style.userSelect = 'none';
+                    if (currentFilter === 'all') {
+                        el.style.background = '#fefcbf';
+                        el.style.borderColor = '#ecc94b';
+                        el.style.color = '#b7791f';
+                        el.style.fontWeight = '700';
+                    } else {
+                        el.style.background = '#fff';
+                        el.style.borderColor = '#e2e8f0';
+                        el.style.color = '#718096';
+                        el.style.fontWeight = '500';
+                    }
+                    el.onclick = function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        syncAndFilterMyReviews('all');
+                    };
+                } else if (/^เชิงลบ\s*\(.*\)$/.test(t)) {
+                    el.innerText = `เชิงลบ (${negativeCount})`;
+                    el.style.cursor = 'pointer';
+                    el.style.userSelect = 'none';
+                    if (currentFilter === 'negative') {
+                        el.style.background = '#fed7d7';
+                        el.style.borderColor = '#fc8181';
+                        el.style.color = '#c53030';
+                        el.style.fontWeight = '700';
+                    } else {
+                        el.style.background = '#fff';
+                        el.style.borderColor = '#feb2b2';
+                        el.style.color = '#e53e3e';
+                        el.style.fontWeight = '500';
+                    }
+                    el.onclick = function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        syncAndFilterMyReviews('negative');
+                    };
+                }
+            }
+        });
+
+        // อัปเดตแถวหัวข้อ "เคาน์เตอร์ X.X ... รีวิว" เพียงบรรทัดเดียว
+        let candidates = allDivs.filter(el => {
+            let txt = (el.innerText || '').trim();
+            return txt.includes('เคาน์เตอร์') &&
+                   txt.includes('รีวิว') &&
+                   !txt.includes('ดูรีวิว') &&
+                   !txt.includes('รีวิวของฉัน') &&
+                   !txt.includes('คะแนนเฉลี่ย') &&
+                   !/\d{1,2}:\d{2}\s*น\./.test(txt);
+        });
+
+        let outerHeader = candidates.find(el => !candidates.includes(el.parentElement));
+
+        if (outerHeader) {
+            let shownCount = currentFilter === 'negative' ? negativeCount : totalCount;
+            outerHeader.style.display = 'flex';
+            outerHeader.style.justifyContent = 'space-between';
+            outerHeader.style.alignItems = 'center';
+            outerHeader.style.padding = '8px 0';
+            outerHeader.style.borderBottom = 'none';
+            outerHeader.innerHTML = `
+                <span style="display:inline-flex; align-items:baseline; gap:6px;">
+                    <strong style="color:#1a202c; font-size:13px;">เคาน์เตอร์ ${counterCode}</strong>
+                    <span style="color:#718096; font-size:12px;">${shownCount} รีวิว</span>
+                </span>
+                <span style="color:#10b981; font-weight:700; font-size:13px;">${avgScoreStr} &#9733;</span>
+            `;
+        }
+    }
+
+    // ดึงรีวิวใหม่ในพื้นหลังเมื่ออยู่บน URL ที่มี active_checkin_id (ไม่ต้องกด F5 เอง และไม่เพิ่มยอด Check-in)
+    function pollLatestReviews() {
+        if (!window.location.search.includes('active_checkin_id')) return;
+
+        originalFetch(window.location.href, {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            cache: 'no-store'
+        })
+        .then(res => res.ok ? res.text() : null)
+        .then(html => {
+            if (!html) return;
+            let parser = new DOMParser();
+            let doc = parser.parseFromString(html, 'text/html');
+
+            let newCards = extractReviewCards(doc);
+            let currentCards = extractReviewCards(document);
+
+            if (newCards.length !== currentCards.length && newCards.length > 0) {
+                let newListContainer = newCards[0].parentElement;
+                let currentListContainer = currentCards.length > 0 ? currentCards[0].parentElement : null;
+
+                if (currentListContainer && newListContainer) {
+                    currentListContainer.innerHTML = newListContainer.innerHTML;
+                    syncAndFilterMyReviews(currentFilter);
+                }
+            }
+        })
+        .catch(() => {});
+    }
+
+    document.body.addEventListener('click', function (e) {
+        let btn = e.target.closest('button, a, div');
+        if (btn && (btn.innerText || '').includes('ดูรีวิวของฉันทั้งหมด')) {
+            setTimeout(() => syncAndFilterMyReviews('all'), 50);
+            setTimeout(() => pollLatestReviews(), 200);
+        }
+    });
+
+    // อัปเดตรีวิวใหม่อัตโนมัติทุกๆ 4 วินาที
+    setInterval(pollLatestReviews, 4000);
+
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(() => syncAndFilterMyReviews('all'), 200);
+    });
+})();
+</script>
 </body>
 </html>

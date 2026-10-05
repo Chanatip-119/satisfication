@@ -8,10 +8,108 @@ use App\Models\Counter;
 use App\Models\Staff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class ScheduleController extends Controller
 {
+    /**
+     * ตรวจสอบจากฐานข้อมูลจริงว่า Slot ตารางปฏิบัติงานนี้มีการ Check-in อยู่หรือไม่
+     */
+    private function isScheduleCheckedIn($sch, $sub = null)
+    {
+        $rawStatus = strtolower(trim($sch->status ?? 'empty'));
+
+        // 1. ถ้าระบุสถานะเป็นลาป่วย หรือ ปิดเคาน์เตอร์ ให้ยึดตามนั้นทันที
+        if (in_array($rawStatus, ['sick', 'close'])) {
+            return false;
+        }
+
+        // 2. ถ้าคอลัมน์ status ในตาราง schedule เป็น checkin / active อยู่แล้ว
+        if (in_array($rawStatus, ['checkin', 'check-in', 'checked_in', 'active', 'working'])) {
+            return true;
+        }
+
+        // 3. ตรวจสอบคอลัมน์เวลา check-in ในตาราง schedule (กรณีมีคอลัมน์เก็บเวลาเช็คอิน)
+        foreach (['check_in_time', 'checkin_time', 'checked_in_at', 'checkin_at', 'time_in'] as $inCol) {
+            if (!empty($sch->{$inCol})) {
+                $isCheckedOut = false;
+                foreach (['check_out_time', 'checkout_time', 'checked_out_at', 'checkout_at', 'time_out'] as $outCol) {
+                    if (!empty($sch->{$outCol})) {
+                        $isCheckedOut = true;
+                        break;
+                    }
+                }
+                if (!$isCheckedOut) return true;
+            }
+        }
+
+        $todayStr = Carbon::today()->format('Y-m-d');
+        $nowTime  = Carbon::now()->format('H:i:s');
+
+        // 4. ตรวจสอบตารางเก็บประวัติการ Check-in แยก (ถ้ามีในฐานข้อมูล)
+        foreach (['checkin', 'checkins', 'check_in', 'check_ins', 'staff_checkin', 'staff_checkins', 'attendance', 'work_logs'] as $tbl) {
+            if (Schema::hasTable($tbl)) {
+                $cols = Schema::getColumnListing($tbl);
+                $q = DB::table($tbl);
+                $matched = false;
+
+                if (in_array('schedule_id', $cols)) {
+                    $q->where('schedule_id', $sch->schedule_id);
+                    $matched = true;
+                } elseif (in_array('staff_id', $cols)) {
+                    $q->where('staff_id', $sch->staff_id);
+                    if (in_array('counter_sub_id', $cols)) {
+                        $q->where('counter_sub_id', $sch->counter_sub_id);
+                    }
+                    foreach (['checkin_date', 'check_in_date', 'date', 'schedule_date', 'created_at'] as $dCol) {
+                        if (in_array($dCol, $cols)) {
+                            $q->whereDate($dCol, $sch->schedule_date);
+                            break;
+                        }
+                    }
+                    $matched = true;
+                }
+
+                if ($matched) {
+                    foreach (['checkout_time', 'check_out_time', 'checked_out_at', 'check_out_at', 'time_out'] as $outCol) {
+                        if (in_array($outCol, $cols)) {
+                            $q->whereNull($outCol);
+                        }
+                    }
+                    if (in_array('status', $cols)) {
+                        $q->whereNotIn('status', ['checkout', 'check-out', 'checked_out', 'completed', 'close']);
+                    }
+                    if ($q->exists()) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // 5. ตรวจสอบจากสถานะของ counter_sub หรือช่วงเวลาปฏิบัติงานจริงของวันนี้
+        if ($sch->schedule_date === $todayStr && $sch->start_time <= $nowTime && $sch->end_time >= $nowTime) {
+            if ($sub) {
+                $subStatus = strtolower(trim($sub->status ?? $sub->sub_status ?? ''));
+                if (in_array($subStatus, ['checkin', 'active', 'open', 'busy', 'working'])) {
+                    return true;
+                }
+                if (isset($sub->is_checkin) && $sub->is_checkin) {
+                    return true;
+                }
+                if (isset($sub->current_staff_id) && $sub->current_staff_id == $sch->staff_id) {
+                    return true;
+                }
+            }
+            // หากสถานะเป็น waiting ในช่วงเวลาทำงานปัจจุบันของวันนี้
+            if ($rawStatus === 'waiting') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function index(Request $request)
     {
         $staffs = Staff::all();
@@ -33,7 +131,6 @@ class ScheduleController extends Controller
                   ->orderBy('schedule_id', 'asc'); 
         }])->where('is_active', true)->get();
 
-        // สร้าง Map จับคู่ counter_sub_id กับ counter_id เพื่อใช้แสดงชื่อเคาน์เตอร์ตอนเกิด Conflict
         $subToCounterMap = [];
         foreach ($counters as $c) {
             foreach ($c->countersubs as $cs) {
@@ -47,6 +144,13 @@ class ScheduleController extends Controller
 
         foreach ($counters as $counter) {
             foreach ($counter->countersubs as $sub) {
+                // อัปเดตสถานะจริงของแต่ละตารางจากฐานข้อมูลก่อนจัดกลุ่ม
+                foreach ($sub->schedules as $schItem) {
+                    if ($this->isScheduleCheckedIn($schItem, $sub)) {
+                        $schItem->status = 'checkin';
+                    }
+                }
+
                 $schedulesByDate = $sub->schedules->groupBy('schedule_date');
                 
                 foreach ($schedulesByDate as $date => $dailySchedules) {
@@ -69,12 +173,18 @@ class ScheduleController extends Controller
                             $sEnd   = Carbon::parse($potentialSub->end_time);
 
                             if ($sStart->lt($pEnd) && $sEnd->gt($pStart)) {
+                                // ถ้าคนแทนทำการ Check-in ให้การ์ดหลักแสดงสถานะ Check-in ด้วย
+                                if (strtolower($potentialSub->status ?? '') === 'checkin' && strtolower($sch->status ?? '') !== 'sick') {
+                                    $sch->status = 'checkin';
+                                }
+
                                 $subsForThisPrimary[] = [
                                     'id'         => $potentialSub->schedule_id,
                                     'name'       => $potentialSub->staff ? $potentialSub->staff->staff_name : 'ไม่ระบุ',
                                     'staff_code' => $potentialSub->staff_id,
                                     'start'      => substr($potentialSub->start_time, 0, 5),
                                     'end'        => substr($potentialSub->end_time, 0, 5),
+                                    'status'     => $potentialSub->status,
                                     'created_at' => $potentialSub->created_at ? Carbon::parse($potentialSub->created_at)->format('d/m/Y H:i') : ''
                                 ];
                                 $processedIds[] = $potentialSub->schedule_id; 
@@ -89,13 +199,12 @@ class ScheduleController extends Controller
 
         $filteredSchedulesCollection = collect($primarySchedules);
         
-        // เตรียมข้อมูลตารางงานทั้งหมดของบุคลากรแต่ละคน พร้อมเลขเคาน์เตอร์ เพื่อส่งให้ JS ตรวจ Conflict
         $staffAvailability = $staffs->map(function($staff) use ($allSchedulesForOverlap, $subToCounterMap) {
             return [
                 'id' => $staff->staff_id,
                 'name' => $staff->staff_name,
                 'schedules' => $allSchedulesForOverlap->where('staff_id', $staff->staff_id)
-                    ->where('status', '!=', 'Sick')
+                    ->filter(fn($s) => strtolower($s->status ?? '') !== 'sick')
                     ->map(function($s) use ($subToCounterMap) {
                         return [
                             'schedule_id'    => $s->schedule_id,
@@ -127,7 +236,6 @@ class ScheduleController extends Controller
             'substitute_staff_id' => 'nullable|integer'
         ]);
 
-        // ตรวจสอบว่าคนหลักและคนสำรองเป็นคนเดียวกันหรือไม่
         if ($request->filled('substitute_staff_id') && $request->staff_id == $request->substitute_staff_id) {
             return redirect()->back()->withErrors(['บุคลากรสำรองต้องไม่ใช่คนเดียวกับบุคลากรหลักครับ']);
         }
@@ -136,16 +244,14 @@ class ScheduleController extends Controller
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : $startDate->copy();
         $selectedDays = $request->work_days ?? [$startDate->dayOfWeek]; 
 
-        // 1. ตรวจสอบ Conflict ในระดับ Backend ก่อนบันทึกจริง
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             if (in_array($date->dayOfWeek, $selectedDays)) {
                 $dateStr = $date->format('Y-m-d');
 
-                // เช็คตารางชนของบุคลากรหลัก
                 $primaryConflict = Schedule::with('staff')
                     ->where('staff_id', $request->staff_id)
                     ->where('schedule_date', $dateStr)
-                    ->where('status', '!=', 'Sick')
+                    ->where('status', '!=', 'sick')
                     ->where(function ($q) use ($request) {
                         $q->where('start_time', '<', $request->end_time)
                           ->where('end_time', '>', $request->start_time);
@@ -157,12 +263,11 @@ class ScheduleController extends Controller
                     return redirect()->back()->withErrors(["Conflict! {$staffName} มี slot ช่วงเวลาเดียวกัน ({$cTime}) ในวันที่ {$dateStr} — กรุณาเปลี่ยนเวลาหรือเลือกคนอื่น"]);
                 }
 
-                // เช็คตารางชนของบุคลากรสำรอง (ถ้ามีการเลือก)
                 if ($request->filled('substitute_staff_id')) {
                     $subConflict = Schedule::with('staff')
                         ->where('staff_id', $request->substitute_staff_id)
                         ->where('schedule_date', $dateStr)
-                        ->where('status', '!=', 'Sick')
+                        ->where('status', '!=', 'sick')
                         ->where(function ($q) use ($request) {
                             $q->where('start_time', '<', $request->end_time)
                               ->where('end_time', '>', $request->start_time);
@@ -177,7 +282,6 @@ class ScheduleController extends Controller
             }
         }
 
-        // 2. บันทึกข้อมูลด้วย Transaction เมื่อไม่พบตารางชน
         return DB::transaction(function () use ($request, $startDate, $endDate, $selectedDays) {
             for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
                 if (in_array($date->dayOfWeek, $selectedDays)) {
@@ -217,13 +321,12 @@ class ScheduleController extends Controller
             'status'        => 'nullable|string'
         ]);
 
-        // ถ้าไม่ได้กดเปลี่ยนเป็นสถานะลาป่วย ให้เช็คว่าเวลาที่แก้ไขไปชนกับตารางอื่นของตัวเองหรือไม่
-        if ($request->status !== 'Sick') {
+        if (strtolower($request->status ?? '') !== 'sick') {
             $conflict = Schedule::with('staff')
                 ->where('staff_id', $request->staff_id)
                 ->where('schedule_date', $request->schedule_date)
                 ->where('schedule_id', '!=', $schedule_id)
-                ->where('status', '!=', 'Sick')
+                ->where('status', '!=', 'sick')
                 ->where(function ($q) use ($request) {
                     $q->where('start_time', '<', $request->end_time)
                       ->where('end_time', '>', $request->start_time);
@@ -242,7 +345,7 @@ class ScheduleController extends Controller
             $schedule->schedule_date = $request->schedule_date;
             $schedule->start_time    = $request->start_time;
             $schedule->end_time      = $request->end_time;
-            if ($request->has('status')) { $schedule->status = $request->status; }
+            if ($request->has('status')) { $schedule->status = strtolower($request->status); }
             $schedule->save();
 
             return redirect()->back()->with('success', 'แก้ไขข้อมูลตารางเรียบร้อยแล้วครับ');

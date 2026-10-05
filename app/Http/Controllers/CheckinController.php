@@ -16,12 +16,107 @@ class CheckinController extends Controller
 {
     private $libraryName = 'สำนักหอสมุด มหาวิทยาลัย';
 
+    /**
+     * ฟังก์ชันกลางสำหรับเตรียมข้อมูลและแสดงหน้า Step 4 (Check-in สำเร็จ + รีวิวของฉัน)
+     */
+    private function renderStep4View($checkin, $counterId)
+    {
+        $staff = Staff::where('staff_id', $checkin->staff_id)->first();
+        $schedule = $checkin->schedule_id
+            ? Schedule::where('schedule_id', $checkin->schedule_id)->first()
+            : Schedule::where('counter_sub_id', $counterId)
+                ->where('staff_id', $checkin->staff_id)
+                ->where('schedule_date', now()->toDateString())
+                ->first();
+
+        $counterSub = CounterSub::with('counter')->where('counter_sub_id', $counterId)->first();
+        $counterName = $counterSub ? 'เคาน์เตอร์ ' . $counterSub->counter_id . '.' . $counterSub->counter_sub_id : 'เคาน์เตอร์ ' . $counterId;
+        $locationName = ($counterSub && $counterSub->counter) ? $counterSub->counter->counter_location : 'ไม่ระบุตำแหน่ง';
+
+        $counterObj = (object)[
+            'name'     => $counterName,
+            'location' => $locationName,
+            'time_end' => $schedule ? substr($schedule->end_time, 0, 5) : '-',
+        ];
+
+        $staffObj = (object)[
+            'name' => $staff ? $staff->staff_name : '-',
+        ];
+
+        $showWarningBar = false;
+        if ($schedule) {
+            $timeEnd = Carbon::parse($schedule->end_time);
+            $showWarningBar = now()->diffInMinutes($timeEnd, false) <= 15 && now()->isBefore($timeEnd);
+        }
+
+        // ดึงรายการประเมินทั้งหมดของพนักงานคนนี้ เรียงจากใหม่ล่าสุดขึ้นก่อน
+        $evaluations = collect([]);
+        if (class_exists(Evaluation::class) && $staff) {
+            $evaluations = Evaluation::whereIn('checkin_id', function ($query) use ($staff) {
+                $query->select('checkin_id')->from('checkin')->where('staff_id', $staff->staff_id);
+            })->orderByDesc('evaluation_id')->get();
+        }
+
+        $avgRating = $evaluations->count() > 0 ? number_format($evaluations->avg('rating'), 1) : '0.0';
+        $totalEval = $evaluations->count();
+        $negEval   = $evaluations->where('rating', '<=', 2)->count();
+
+        $reviewStats = (object)[
+            'average'                 => $avgRating,
+            'total'                   => $totalEval,
+            'negative'                => $negEval,
+            'current_counter_total'   => $totalEval,
+            'current_counter_average' => $avgRating,
+        ];
+
+        $checkinFallbackTime = $checkin->checkin_at ?? now();
+
+        $reviewsList = $evaluations->map(function ($eval) use ($checkinFallbackTime) {
+            $dateSource = $eval->created_at ?? $eval->evaluation_date ?? $checkinFallbackTime;
+            return (object)[
+                'date'    => Carbon::parse($dateSource)->translatedFormat('j M.'),
+                'time'    => Carbon::parse($dateSource)->format('H:i'),
+                'rating'  => (int) $eval->rating,
+                'comment' => $eval->comment
+            ];
+        });
+
+        return view('checkin.index', [
+            'step'               => 4,
+            'library_name'       => $this->libraryName,
+            'counter'            => $counterObj,
+            'staff'              => $staffObj,
+            'checkin_time'       => Carbon::parse($checkin->checkin_at)->format('H:i'),
+            'current_checkin_id' => $checkin->checkin_id,
+            'show_warning_bar'   => $showWarningBar,
+            'review_stats'       => $reviewStats,
+            'review_filters'     => collect([]),
+            'reviews'            => $reviewsList
+        ]);
+    }
+
     public function index(Request $request)
     {
+        // รองรับการกด F5 รีเฟรชหน้า Step 4 โดยไม่สร้าง Check-in ซ้ำ และไม่เกิด MethodNotAllowed
+        if ($request->has('active_checkin_id')) {
+            $activeCheckin = Checkin::where('checkin_id', $request->active_checkin_id)
+                ->whereNull('checkout_at')
+                ->first();
+
+            if ($activeCheckin) {
+                $cId = $request->query('c_id');
+                if (!$cId && $activeCheckin->schedule_id) {
+                    $sch = Schedule::where('schedule_id', $activeCheckin->schedule_id)->first();
+                    $cId = $sch ? $sch->counter_sub_id : 1;
+                }
+                return $this->renderStep4View($activeCheckin, $cId ?: 1);
+            }
+        }
+
         if ($request->has('counter_id')) {
             return view('checkin.index', [
-                'step' => 2,
-                'library_name' => $this->libraryName,
+                'step'                => 2,
+                'library_name'        => $this->libraryName,
                 'selected_counter_id' => $request->counter_id
             ]);
         }
@@ -31,15 +126,13 @@ class CheckinController extends Controller
 
         foreach ($counters as $counter) {
             foreach ($counter->countersubs as $sub) {
-                // ดึง Schedule ทั้งหมดของเคาน์เตอร์นี้ในวันนี้
                 $schedules = Schedule::where('counter_sub_id', $sub->counter_sub_id)
                     ->where('schedule_date', now()->toDateString())
                     ->get();
 
                 $scheduleIds = $schedules->pluck('schedule_id');
                 $hasActiveCheckin = false;
-                
-                // เช็คว่าเคาน์เตอร์มีคนใช้อยู่ไหม โดยดูจากทุก Schedule ของเคาน์เตอร์นี้
+
                 if ($scheduleIds->isNotEmpty()) {
                     $hasActiveCheckin = Checkin::whereIn('schedule_id', $scheduleIds)
                         ->whereNull('checkout_at')
@@ -48,15 +141,13 @@ class CheckinController extends Controller
 
                 $firstSchedule = $schedules->first();
 
-                if ($schedules->isNotEmpty() || true) { // เปลี่ยนเป็น true ถ้าอยากให้แสดงเคาน์เตอร์ตลอดแม้ไม่มี Schedule
-                    $countersList->push((object)[
-                        'id'           => $sub->counter_sub_id,
-                        'name'         => 'เคาน์เตอร์ ' . $counter->counter_id . '.' . $sub->counter_sub_id,
-                        'time_start'   => $firstSchedule ? substr($firstSchedule->start_time, 0, 5) : '-',
-                        'time_end'     => $firstSchedule ? substr($firstSchedule->end_time, 0, 5) : '-',
-                        'is_available' => !$hasActiveCheckin,
-                    ]);
-                }
+                $countersList->push((object)[
+                    'id'           => $sub->counter_sub_id,
+                    'name'         => 'เคาน์เตอร์ ' . $counter->counter_id . '.' . $sub->counter_sub_id,
+                    'time_start'   => $firstSchedule ? substr($firstSchedule->start_time, 0, 5) : '-',
+                    'time_end'     => $firstSchedule ? substr($firstSchedule->end_time, 0, 5) : '-',
+                    'is_available' => !$hasActiveCheckin,
+                ]);
             }
         }
 
@@ -86,13 +177,11 @@ class CheckinController extends Controller
             return back()->withErrors(['pin' => 'PIN ไม่ถูกต้อง']);
         }
 
-        // หา Schedule เฉพาะของ "พนักงานคนนี้"
         $schedule = Schedule::where('counter_sub_id', $request->counter_id)
             ->where('staff_id', $staff->staff_id)
             ->where('schedule_date', now()->toDateString())
             ->first();
 
-        // เช็คหาคนที่กำลังใช้อยู่ปัจจุบัน (จาก schedule_id ไหนก็ได้ของเคาน์เตอร์นี้)
         $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
             ->where('schedule_date', now()->toDateString())
             ->pluck('schedule_id');
@@ -142,31 +231,73 @@ class CheckinController extends Controller
             'staff_id'   => 'required'
         ]);
 
-        // ดึง Schedule ของพนักงานคนนี้
         $schedule = Schedule::where('counter_sub_id', $request->counter_id)
             ->where('staff_id', $request->staff_id)
             ->where('schedule_date', now()->toDateString())
             ->first();
 
-        // Auto-Kick บุคลากรเดิมที่ค้างอยู่ + สร้าง Checkin ใหม่ (atomic operation)
         $newCheckin = DB::transaction(function () use ($request, $schedule) {
             $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
                 ->where('schedule_date', now()->toDateString())
                 ->pluck('schedule_id');
 
-            if ($allSchedulesToday->isNotEmpty()) {
-                $activeCheckin = Checkin::whereIn('schedule_id', $allSchedulesToday)
-                    ->whereNull('checkout_at')
-                    ->first();
+            // 1. เช็คว่าพนักงานคนนี้มีรายการ Check-in ที่ยังไม่ได้ Check-out อยู่แล้วหรือไม่
+            $existingSelfCheckin = Checkin::where('staff_id', $request->staff_id)
+                ->whereNull('checkout_at')
+                ->when($schedule, function ($q) use ($schedule) {
+                    return $q->where('schedule_id', $schedule->schedule_id);
+                })
+                ->latest('checkin_id')
+                ->first();
 
-                if ($activeCheckin) {
+            // 2. ล้างแถวที่เคยเผลอกด F5 เบิ้ลซ้ำ (is_kicked = 1 ของตัวเองในวันนี้) โดยย้าย Evaluation มารวมที่แถวหลักก่อนลบ
+            $targetMainCheckinId = $existingSelfCheckin ? $existingSelfCheckin->checkin_id : null;
+
+            if ($existingSelfCheckin) {
+                $duplicateIds = Checkin::where('staff_id', $request->staff_id)
+                    ->where('checkin_id', '!=', $targetMainCheckinId)
+                    ->where('is_kicked', 1)
+                    ->whereDate('checkin_at', now()->toDateString())
+                    ->pluck('checkin_id');
+
+                if ($duplicateIds->isNotEmpty()) {
+                    if (class_exists(Evaluation::class)) {
+                        Evaluation::whereIn('checkin_id', $duplicateIds)
+                            ->update(['checkin_id' => $targetMainCheckinId]);
+                    }
+                    Checkin::whereIn('checkin_id', $duplicateIds)->delete();
+                }
+
+                if ($schedule && strtolower($schedule->status ?? '') !== 'checkin') {
+                    $schedule->status = 'checkin';
+                    $schedule->save();
+                }
+
+                return $existingSelfCheckin;
+            }
+
+            // 3. กรณีมีบุคลากร "คนอื่น" ค้างอยู่ที่เคาน์เตอร์นี้ ให้ทำการ Auto-Kick คนเก่าออก
+            if ($allSchedulesToday->isNotEmpty()) {
+                $activeOtherCheckins = Checkin::whereIn('schedule_id', $allSchedulesToday)
+                    ->where('staff_id', '!=', $request->staff_id)
+                    ->whereNull('checkout_at')
+                    ->get();
+
+                foreach ($activeOtherCheckins as $activeCheckin) {
                     $activeCheckin->checkout_at = now();
                     $activeCheckin->duration_min = now()->diffInMinutes(Carbon::parse($activeCheckin->checkin_at));
                     $activeCheckin->is_kicked = 1;
                     $activeCheckin->save();
+
+                    if ($activeCheckin->schedule_id) {
+                        Schedule::where('schedule_id', $activeCheckin->schedule_id)
+                            ->where('status', 'checkin')
+                            ->update(['status' => 'empty']);
+                    }
                 }
             }
 
+            // 4. สร้างรายการ Check-in ใหม่
             $checkin = new Checkin();
             $checkin->schedule_id = $schedule ? $schedule->schedule_id : null;
             $checkin->staff_id = $request->staff_id;
@@ -175,68 +306,33 @@ class CheckinController extends Controller
             $checkin->is_kicked = 0;
             $checkin->save();
 
+            // ยุบรวมแถวที่เคยเบิ้ลซ้ำของวันนี้ (ถ้ามี) มาไว้ที่รายการใหม่นี้
+            $oldDupIds = Checkin::where('staff_id', $request->staff_id)
+                ->where('checkin_id', '!=', $checkin->checkin_id)
+                ->where('is_kicked', 1)
+                ->whereDate('checkin_at', now()->toDateString())
+                ->pluck('checkin_id');
+
+            if ($oldDupIds->isNotEmpty()) {
+                if (class_exists(Evaluation::class)) {
+                    Evaluation::whereIn('checkin_id', $oldDupIds)
+                        ->update(['checkin_id' => $checkin->checkin_id]);
+                }
+                Checkin::whereIn('checkin_id', $oldDupIds)->delete();
+            }
+
+            if ($schedule) {
+                $schedule->status = 'checkin';
+                $schedule->save();
+            }
+
             return $checkin;
         });
 
-        $staff = Staff::where('staff_id', $request->staff_id)->first();
-        $counterSub = CounterSub::with('counter')->where('counter_sub_id', $request->counter_id)->first();
-        $counterName = $counterSub ? 'เคาน์เตอร์ ' . $counterSub->counter_id . '.' . $counterSub->counter_sub_id : 'เคาน์เตอร์ ' . $request->counter_id;
-        $locationName = ($counterSub && $counterSub->counter) ? $counterSub->counter->counter_location : 'ไม่ระบุตำแหน่ง';
-
-        $counterObj = (object)[
-            'name'       => $counterName,
-            'location'   => $locationName,
-            'time_end'   => $schedule ? substr($schedule->end_time, 0, 5) : '-',
-        ];
-
-        $staffObj = (object)[
-            'name' => $staff ? $staff->staff_name : '-',
-        ];
-
-        $showWarningBar = false;
-        if ($schedule) {
-            $timeEnd = Carbon::parse($schedule->end_time);
-            $showWarningBar = now()->diffInMinutes($timeEnd, false) <= 15 && now()->isBefore($timeEnd);
-        }
-
-        $evaluations = collect([]);
-        if (class_exists(Evaluation::class)) {
-            $evaluations = Evaluation::whereIn('checkin_id', function($query) use ($staff) {
-                if ($staff) {
-                    $query->select('checkin_id')->from('checkin')->where('staff_id', $staff->staff_id);
-                }
-            })->get();
-        }
-
-        $reviewStats = (object)[
-            'average' => $evaluations->count() > 0 ? number_format($evaluations->avg('rating'), 1) : '0.0',
-            'total'   => $evaluations->count(),
-            'negative'=> $evaluations->where('rating', '<=', 2)->count(),
-            'current_counter_total' => $evaluations->count(),
-            'current_counter_average' => $evaluations->count() > 0 ? number_format($evaluations->avg('rating'), 1) : '0.0',
-        ];
-
-        $reviewsList = $evaluations->map(function($eval) {
-            $dateSource = $eval->created_at ?? now(); 
-            return (object)[
-                'date'    => Carbon::parse($dateSource)->translatedFormat('j M.'),
-                'time'    => Carbon::parse($dateSource)->format('H:i'),
-                'rating'  => $eval->rating,
-                'comment' => $eval->comment
-            ];
-        });
-
-        return view('checkin.index', [
-            'step'               => 4,
-            'library_name'       => $this->libraryName,
-            'counter'            => $counterObj,
-            'staff'              => $staffObj,
-            'checkin_time'       => now()->format('H:i'),
-            'current_checkin_id' => $newCheckin->checkin_id,
-            'show_warning_bar'   => $showWarningBar,
-            'review_stats'       => $reviewStats,
-            'review_filters'     => collect([]),
-            'reviews'            => $reviewsList
+        // Redirect ไปที่ GET /checkin?active_checkin_id=... เพื่อป้องกันปัญหา MethodNotAllowed และการส่ง POST ซ้ำเมื่อกด F5 100%!
+        return redirect()->route('checkin.index', [
+            'active_checkin_id' => $newCheckin->checkin_id,
+            'c_id'              => $request->counter_id
         ]);
     }
 
@@ -250,6 +346,11 @@ class CheckinController extends Controller
             $checkin->duration_min = now()->diffInMinutes(Carbon::parse($checkin->checkin_at));
             $checkin->is_kicked = 0;
             $checkin->save();
+
+            if ($checkin->schedule_id) {
+                Schedule::where('schedule_id', $checkin->schedule_id)
+                    ->update(['status' => 'empty']);
+            }
         }
 
         return redirect()->route('checkin.index');

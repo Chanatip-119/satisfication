@@ -1,7 +1,55 @@
 /* =========================================
-   Dashboard Specific Styles
-   (ใช้โครงสร้าง Sidebar, Body, Buttons ร่วมกับ schedule.css 100%)
+   Layout & Sidebar Structure Fix
    ========================================= */
+body {
+    display: flex !important;
+    min-height: 100vh !important;
+    align-items: stretch !important;
+    overflow-x: hidden;
+}
+
+.sidebar {
+    width: 240px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100vh !important;
+    height: auto !important;
+    align-self: stretch !important;
+}
+
+.content {
+    flex: 1 !important;
+    min-width: 0 !important;
+    padding: 28px 32px !important;
+    box-sizing: border-box !important;
+}
+
+.logout-btn {
+    margin-top: auto !important;
+    color: #fff !important;
+    text-decoration: none !important;
+    padding: 14px 16px 6px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+    position: sticky !important;
+    bottom: 15px !important;
+}
+
+.logout-btn:hover {
+    opacity: 0.85;
+}
+
+/* =========================================
+   Header & Period Filter
+   ========================================= */
+.period-form {
+    margin: 0;
+}
 
 .period-select-wrapper {
     position: relative;
@@ -13,11 +61,17 @@
     padding: 7px 14px;
     gap: 8px;
     transition: 0.2s;
+    white-space: nowrap;
 }
 
 .period-select-wrapper:hover {
     border-color: #a0aec0;
     background: #f7fafc;
+}
+
+.period-icon {
+    color: #4a5568;
+    font-size: 13px;
 }
 
 .period-select {
@@ -30,12 +84,16 @@
     cursor: pointer;
 }
 
+.btn-export-link {
+    text-decoration: none;
+}
+
 /* =========================================
    Top 4 Summary KPI Cards
    ========================================= */
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 18px;
     margin-bottom: 22px;
 }
@@ -45,6 +103,7 @@
     border-radius: 12px;
     padding: 20px 22px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    min-width: 0;
 }
 
 .kpi-label {
@@ -55,6 +114,7 @@
     align-items: center;
     gap: 6px;
     margin-bottom: 8px;
+    white-space: nowrap;
 }
 
 .kpi-value {
@@ -70,9 +130,10 @@
    ========================================= */
 .dashboard-main-grid {
     display: grid;
-    grid-template-columns: 2.3fr 1fr;
+    grid-template-columns: minmax(0, 2.2fr) minmax(290px, 1fr);
     gap: 18px;
     margin-bottom: 18px;
+    align-items: start;
 }
 
 .left-col,
@@ -80,6 +141,7 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
+    min-width: 0;
 }
 
 .panel-card {
@@ -87,34 +149,57 @@
     border-radius: 12px;
     padding: 22px 24px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    min-width: 0;
+    overflow: hidden; /* ป้องกันตารางด้านในทะลุกรอบการ์ดออกมาเด็ดขาด */
+    position: relative;
+    z-index: 1;
 }
 
 .panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     margin-bottom: 16px;
+}
+
+.panel-header-compact {
+    margin-bottom: 8px;
 }
 
 .panel-title {
     font-size: 15px;
     font-weight: 700;
     color: #1a202c;
+    white-space: nowrap;
 }
 
 .panel-subtitle {
     font-size: 12px;
     color: #718096;
     font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.chart-container {
+    height: 210px;
+    position: relative;
+    width: 100%;
 }
 
 /* =========================================
-   Current Counter Status Table
+   Current Counter Status Table (แก้บั๊กตารางล้น)
    ========================================= */
-.status-table {
+.table-responsive-wrapper {
     width: 100%;
-    border-collapse: collapse;
-    table-layout: auto;
+    overflow-x: auto;
+}
+
+.status-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important; /* บังคับสัดส่วนคอลัมน์ให้อยู่ในกรอบ 100% */
 }
 
 .status-table th {
@@ -122,27 +207,38 @@
     font-size: 11px;
     font-weight: 600;
     color: #718096;
-    padding: 10px 8px;
+    padding: 10px 6px !important;
     border-bottom: 1px solid #edf2f7;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .status-table td {
-    padding: 12px 8px;
+    padding: 12px 6px !important;
     font-size: 13px;
     border-bottom: 1px solid #f7fafc;
-    border-right: none;
+    border-right: none !important;
     vertical-align: middle;
-    min-height: auto;
+    min-height: auto !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .status-table td:first-child {
-    border-right: none;
+    border-right: none !important;
 }
+
+.col-counter { width: 25%; }
+.col-staff   { width: 23%; }
+.col-time    { width: 16%; }
+.col-score   { width: 13%; text-align: center !important; }
+.col-eval    { width: 10%; text-align: center !important; }
+.col-status  { width: 13%; text-align: right !important; }
 
 .counter-code-bold {
     font-weight: 700;
     color: #1a202c;
+    white-space: nowrap;
 }
 
 .counter-floor-sub {
@@ -151,19 +247,45 @@
     margin-left: 4px;
 }
 
+.staff-name-bold {
+    font-weight: 700;
+    color: #1a202c;
+}
+
 .staff-empty {
     color: #a0aec0;
     font-weight: 400;
+    white-space: nowrap;
+}
+
+.time-cell {
+    color: #4a5568;
+    white-space: nowrap;
+}
+
+.eval-count-cell {
+    text-align: center;
+    font-weight: 700;
+}
+
+.text-center { text-align: center !important; }
+.text-right  { text-align: right !important; }
+.text-muted  { color: #a0aec0; }
+
+.empty-table-msg {
+    text-align: center !important;
+    color: #a0aec0;
+    padding: 25px !important;
 }
 
 .score-pill {
     display: inline-block;
-    padding: 3px 12px;
+    padding: 3px 10px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 700;
     text-align: center;
-    min-width: 44px;
+    min-width: 42px;
 }
 
 .score-high { background: #e6fffa; color: #047857; }
@@ -174,10 +296,11 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
+    white-space: nowrap;
 }
 
 .status-pill.active    { background: #dcfce7; color: #15803d; }
@@ -189,6 +312,7 @@
     height: 6px;
     border-radius: 50%;
     background: currentColor;
+    flex-shrink: 0;
 }
 
 /* =========================================
@@ -200,22 +324,27 @@
     gap: 10px;
     margin-bottom: 10px;
     font-size: 12px;
+    width: 100%;
 }
 
 .star-emoji {
     font-size: 16px;
     width: 22px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .star-label {
-    width: 35px;
+    width: 36px;
     color: #4a5568;
     font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .star-bar-bg {
     flex: 1;
+    min-width: 90px;
     height: 7px;
     background: #edf2f7;
     border-radius: 10px;
@@ -234,10 +363,11 @@
 .star-bar-1 { background: #ef4444; }
 
 .star-count {
-    width: 28px;
+    width: 26px;
     text-align: right;
     font-weight: 600;
     color: #4a5568;
+    flex-shrink: 0;
 }
 
 .checkin-list-section {
@@ -246,10 +376,15 @@
     border-top: 1px solid #edf2f7;
 }
 
+.checkin-title {
+    margin-bottom: 10px;
+}
+
 .checkin-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     padding: 10px 0;
     border-bottom: 1px solid #f7fafc;
 }
@@ -270,6 +405,12 @@
     margin-top: 2px;
 }
 
+.empty-sub-msg {
+    font-size: 12px;
+    color: #a0aec0;
+    padding: 10px 0;
+}
+
 /* =========================================
    Highest & Needs Improvement Card
    ========================================= */
@@ -283,16 +424,34 @@
     padding-bottom: 0;
 }
 
+.perf-group-spaced {
+    padding-top: 14px;
+}
+
 .perf-tag {
     font-size: 11px;
     color: #718096;
     margin-bottom: 6px;
+    white-space: nowrap;
 }
 
 .perf-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
+}
+
+.perf-staff-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: #1a202c;
+}
+
+.perf-staff-meta {
+    font-size: 12px;
+    color: #718096;
+    margin-top: 2px;
 }
 
 .score-badge-lg {
@@ -300,6 +459,7 @@
     border-radius: 18px;
     font-size: 14px;
     font-weight: 700;
+    flex-shrink: 0;
 }
 
 /* =========================================
@@ -307,7 +467,7 @@
    ========================================= */
 .dashboard-bottom-grid {
     display: grid;
-    grid-template-columns: 1fr 1.3fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
     gap: 18px;
 }
 
@@ -323,10 +483,13 @@
     font-size: 13px;
     font-weight: 600;
     color: #2d3748;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .counter-avg-bar-bg {
     flex: 1;
+    min-width: 100px;
     height: 8px;
     background: #edf2f7;
     border-radius: 10px;
@@ -345,6 +508,7 @@
     font-size: 13px;
     font-weight: 700;
     color: #1a202c;
+    flex-shrink: 0;
 }
 
 .comment-item {
@@ -363,43 +527,52 @@
     font-size: 12px;
 }
 
+.comment-author {
+    font-weight: 700;
+    color: #2b6cb0;
+}
+
+.comment-rating {
+    color: #d69e2e;
+    font-weight: 700;
+}
+
+.comment-time {
+    color: #a0aec0;
+    font-weight: 400;
+    margin-left: 6px;
+}
+
 .comment-text {
     font-size: 13px;
     color: #2d3748;
 }
 
-/* บังคับให้ Sidebar ยาวเต็มจอเสมอแม้เลื่อนหน้าจอลงมาด้านล่าง */
-.sidebar {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    bottom: 0 !important;
-    height: 100vh !important;
-    min-height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    z-index: 100 !important;
+.empty-comments-msg {
+    text-align: center;
+    color: #a0aec0;
+    font-size: 13px;
+    padding: 30px 0;
 }
 
-/* ดันเนื้อหาหลักไม่ให้ทับกับ Sidebar ที่ถูกตรึงไว้ */
-.content {
-    margin-left: 240px !important; /* ถ้าความกว้าง sidebar ของคุณคือ 240px หรือ 250px ให้ปรับตัวเลขนี้ให้ตรงกันครับ */
-    min-height: 100vh !important;
-}
-
-/* ปุ่ม Logout เกาะติดขอบล่างสุดเสมอ */
-.logout-btn {
-    margin-top: auto !important;
-    color: #fff !important;
-    text-decoration: none !important;
-    padding: 14px 16px 6px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
-}
-.logout-btn:hover {
-    opacity: 0.85;
+/* =========================================
+   Responsive สำหรับหน้าจอ Notebook
+   ========================================= */
+@media screen and (max-width: 1600px) {
+    .content {
+        padding: 22px 24px !important;
+    }
+    .dashboard-main-grid {
+        grid-template-columns: minmax(0, 1.95fr) minmax(280px, 1fr);
+        gap: 16px;
+    }
+    .kpi-grid {
+        gap: 16px;
+    }
+    .kpi-card {
+        padding: 16px 18px;
+    }
+    .panel-card {
+        padding: 18px 20px;
+    }
 }

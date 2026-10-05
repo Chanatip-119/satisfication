@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('staff_name');
             $table->string('staff_email');
             $table->string('staff_pincode');
+            $table->string('password')->nullable();
             $table->foreignId('role_id')->constrained('role','role_id')->cascadeOnDelete();
             $table->timestamp('created_at')->nullable()->useCurrent();
             $table->timestamp('deleted_at')->nullable();
