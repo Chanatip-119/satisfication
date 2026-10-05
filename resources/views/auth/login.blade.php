@@ -28,7 +28,13 @@
             <p>กรุณากรอกชื่อผู้ใช้งานและรหัสผ่านเพื่อเข้าสู่ระบบ</p>
         </div>
 
-        <form action="{{ url('/checkin') }}" method="GET">
+        @if(session('success'))
+        <div class="alert-success">
+            ✅ {{ session('success') }}
+        </div>
+        @endif
+
+        <form action="{{ url('/dashboard') }}" method="GET">
             @csrf
             <div class="form-group">
                 <label>ชื่อผู้ใช้งาน (Username)</label>
@@ -71,6 +77,10 @@
 
             <button type="submit" class="btn-login">เข้าสู่ระบบ</button>
         </form>
+
+        <div class="register-section">
+            <p>ยังไม่มีบัญชี? <a href="{{ route('register') }}" class="register-link">สมัครสมาชิก</a></p>
+        </div>
     </div>
 
     <script>

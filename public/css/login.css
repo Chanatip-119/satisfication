@@ -233,3 +233,35 @@
         .btn-login:hover {
             background-color: #ecc94b;
         }
+
+        /* Register section */
+        .register-section {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .register-link {
+            color: #ecc94b;
+            font-weight: 700;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .register-link:hover {
+            color: #d69e2e;
+            text-decoration: underline;
+        }
+
+        /* Success alert */
+        .alert-success {
+            background-color: #f0fff4;
+            border: 1px solid #9ae6b4;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            color: #276749;
+            font-size: 14px;
+            font-weight: 600;
+        }

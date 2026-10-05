@@ -21,7 +21,7 @@ body {
 .menu-item { display: block; padding: 12px 30px; color: #4a4a4a; text-decoration: none; font-weight: 500; font-size: 16px; transition: 0.3s; }
 .menu-item:hover { background-color: rgba(255, 255, 255, 0.2); }
 .menu-item.active { background-color: #ffffff; color: #FFCC00; border-radius: 0 30px 30px 0; margin-right: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-.logout-btn { margin-top: auto; padding: 20px 30px; color: #ffffff; text-decoration: none; font-weight: 600; border-top: 1px solid rgba(255,255,255,0.3); }
+.logout-btn { margin-top: auto; padding: 20px 30px; color: #ffffff; text-decoration: none; font-weight: 500; border-top: 1px solid rgba(255,255,255,0.3); }
 
 /* Main Content */
 .content { flex: 1; padding: 40px; overflow-y: auto; }
@@ -102,3 +102,39 @@ td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middl
 .delete-box h4 { color: #e53e3e; font-size: 15px; margin-bottom: 4px; font-weight: 600; }
 .delete-box p { color: #f56565; font-size: 13px; }
 .btn-delete { background: #ffffff; color: #e53e3e; border: 1px solid #feb2b2; padding: 8px 15px; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; gap: 5px; align-items: center; font-family: 'Sarabun', sans-serif; font-size: 13px; }
+
+/* บังคับให้ Sidebar ยาวเต็มจอเสมอแม้เลื่อนหน้าจอลงมาด้านล่าง */
+.sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 100 !important;
+}
+
+/* ดันเนื้อหาหลักไม่ให้ทับกับ Sidebar ที่ถูกตรึงไว้ */
+.content {
+    margin-left: 240px !important; /* ถ้าความกว้าง sidebar ของคุณคือ 240px หรือ 250px ให้ปรับตัวเลขนี้ให้ตรงกันครับ */
+    min-height: 100vh !important;
+}
+
+/* ปุ่ม Logout เกาะติดขอบล่างสุดเสมอ */
+.logout-btn {
+    margin-top: auto !important;
+    color: #fff !important;
+    text-decoration: none !important;
+    padding: 14px 16px 6px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+.logout-btn:hover {
+    opacity: 0.85;
+}

@@ -248,6 +248,32 @@
             text-decoration: underline;
         }
 
+        /* Error alert */
+        .alert-error {
+            background-color: #fff5f5;
+            border: 1px solid #fed7d7;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+        }
+
+        .alert-error ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .alert-error ul li {
+            color: #c53030;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 2px 0;
+        }
+
+        .alert-error ul li::before {
+            content: "⚠ ";
+        }
+
         @media (max-width: 600px) {
             .form-row {
                 flex-direction: column;
@@ -274,8 +300,18 @@
             <p>กรอกข้อมูลด้านล่างเพื่อสร้างบัญชีผู้ใช้งานระบบ</p>
         </div>
 
-        <form action="#" method="POST">
+        <form action="{{ route('register.store') }}" method="POST">
             @csrf
+
+            @if ($errors->any())
+            <div class="alert-error">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
             
             <div class="form-group">
                 <label>ชื่อ-นามสกุล (Full Name)</label>
@@ -284,7 +320,7 @@
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
-                    <input type="text" name="name" placeholder="นาย/นางสาว..." required>
+                    <input type="text" name="name" value="{{ old('name') }}" placeholder="นาย/นางสาว..." required>
                 </div>
             </div>
 
@@ -296,7 +332,7 @@
                             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                             <polyline points="22,6 12,13 2,6"></polyline>
                         </svg>
-                        <input type="email" name="email" placeholder="email@go.buu.ac.th" required>
+                        <input type="email" name="email" value="{{ old('email') }}" placeholder="email@go.buu.ac.th" required>
                     </div>
                 </div>
 
@@ -309,7 +345,7 @@
                             <line x1="8" y1="2" x2="8" y2="6"></line>
                             <line x1="3" y1="10" x2="21" y2="10"></line>
                         </svg>
-                        <input type="text" name="staff_id" placeholder="เช่น BUU-010" required>
+                        <input type="text" name="staff_id" value="{{ old('staff_id') }}" placeholder="เช่น BUU-010" required>
                     </div>
                 </div>
             </div>

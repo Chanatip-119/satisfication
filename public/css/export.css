@@ -23,7 +23,7 @@ body {
 .menu-item { display: block; padding: 12px 30px; color: #4a4a4a; text-decoration: none; font-weight: 500; font-size: 16px; transition: 0.3s; }
 .menu-item:hover { background-color: rgba(255, 255, 255, 0.2); }
 .menu-item.active { background-color: #ffffff; color: #FFCC00; border-radius: 0 30px 30px 0; margin-right: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-.logout-btn { margin-top: auto; padding: 20px 30px; color: #ffffff; text-decoration: none; font-weight: 600; border-top: 1px solid rgba(255,255,255,0.3); }
+.logout-btn { margin-top: auto; padding: 14px 16px; color: #ffffff; text-decoration: none; font-weight: 500; border-top: 1px solid rgba(255,255,255,0.35); }
 
 /* =========================================
    Main Content 
@@ -126,3 +126,40 @@ body {
 .btn-export:hover { 
     background-color: #e6b800; 
 }
+
+/* บังคับให้ Sidebar ยาวเต็มจอเสมอแม้เลื่อนหน้าจอลงมาด้านล่าง */
+.sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 100 !important;
+}
+
+/* ดันเนื้อหาหลักไม่ให้ทับกับ Sidebar ที่ถูกตรึงไว้ */
+.content {
+    margin-left: 240px !important; /* ถ้าความกว้าง sidebar ของคุณคือ 240px หรือ 250px ให้ปรับตัวเลขนี้ให้ตรงกันครับ */
+    min-height: 100vh !important;
+}
+
+/* ปุ่ม Logout เกาะติดขอบล่างสุดเสมอ */
+.logout-btn {
+    margin-top: auto !important;
+    color: #fff !important;
+    text-decoration: none !important;
+    padding: 14px 16px 6px 16px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+.logout-btn:hover {
+    opacity: 0.85;
+}
+

@@ -8,26 +8,6 @@
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ time() }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .sidebar {
-            display: flex !important;
-            flex-direction: column !important;
-            height: 100vh !important;
-        }
-        .logout-btn {
-            margin-top: auto !important;
-            color: #fff !important;
-            text-decoration: none !important;
-            padding: 14px 16px 6px 16px !important;
-            font-size: 14px !important;
-            font-weight: 500 !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 8px !important;
-            border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
-        }
-        .logout-btn:hover { opacity: 0.85; }
-    </style>
 </head>
 <body>
 
@@ -47,7 +27,7 @@
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
-        <a href="{{ url('/logout') }}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        <a href="{{ url('/') }}" class="logout-btn"></i>↩ Logout</a>
     </div>
 
     <!-- Main Content -->
@@ -181,7 +161,7 @@
                     </div>
 
                     <?php
-                        $emojis = [5 => '🤩', 4 => '😊', 3 => '😐', 2 => '😕', 1 => '😞'];
+                        $emojis = [5 => '😁', 4 => '🙂', 3 => '😐', 2 => '😓', 1 => '😡'];
                         foreach ([5, 4, 3, 2, 1] as $star):
                             $cnt = $starCounts[$star] ?? 0;
                             $pct = $maxStarCount > 0 ? round(($cnt / $maxStarCount) * 100) : 0;
