@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\Counter;
 use App\Models\Staff;
+use App\Models\Checkin;
+use App\Models\Evaluation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -20,17 +22,14 @@ class ScheduleController extends Controller
     {
         $rawStatus = strtolower(trim($sch->status ?? 'empty'));
 
-        // 1. ถ้าระบุสถานะเป็นลาป่วย หรือ ปิดเคาน์เตอร์ ให้ยึดตามนั้นทันที
         if (in_array($rawStatus, ['sick', 'close'])) {
             return false;
         }
 
-        // 2. ถ้าคอลัมน์ status ในตาราง schedule เป็น checkin / active อยู่แล้ว
         if (in_array($rawStatus, ['checkin', 'check-in', 'checked_in', 'active', 'working'])) {
             return true;
         }
 
-        // 3. ตรวจสอบคอลัมน์เวลา check-in ในตาราง schedule (กรณีมีคอลัมน์เก็บเวลาเช็คอิน)
         foreach (['check_in_time', 'checkin_time', 'checked_in_at', 'checkin_at', 'time_in'] as $inCol) {
             if (!empty($sch->{$inCol})) {
                 $isCheckedOut = false;
@@ -44,10 +43,10 @@ class ScheduleController extends Controller
             }
         }
 
-        $todayStr = Carbon::today()->format('Y-m-d');
-        $nowTime  = Carbon::now()->format('H:i:s');
+        // บังคับใช้ Timezone ไทยเพื่อความแม่นยำ 100%
+        $todayStr = Carbon::now('Asia/Bangkok')->format('Y-m-d');
+        $nowTime  = Carbon::now('Asia/Bangkok')->format('H:i:s');
 
-        // 4. ตรวจสอบตารางเก็บประวัติการ Check-in แยก (ถ้ามีในฐานข้อมูล)
         foreach (['checkin', 'checkins', 'check_in', 'check_ins', 'staff_checkin', 'staff_checkins', 'attendance', 'work_logs'] as $tbl) {
             if (Schema::hasTable($tbl)) {
                 $cols = Schema::getColumnListing($tbl);
@@ -87,7 +86,6 @@ class ScheduleController extends Controller
             }
         }
 
-        // 5. ตรวจสอบจากสถานะของ counter_sub หรือช่วงเวลาปฏิบัติงานจริงของวันนี้
         if ($sch->schedule_date === $todayStr && $sch->start_time <= $nowTime && $sch->end_time >= $nowTime) {
             if ($sub) {
                 $subStatus = strtolower(trim($sub->status ?? $sub->sub_status ?? ''));
@@ -101,7 +99,6 @@ class ScheduleController extends Controller
                     return true;
                 }
             }
-            // หากสถานะเป็น waiting ในช่วงเวลาทำงานปัจจุบันของวันนี้
             if ($rawStatus === 'waiting') {
                 return true;
             }
@@ -112,9 +109,51 @@ class ScheduleController extends Controller
 
     public function index(Request $request)
     {
+        // ==========================================
+        // ระบบ Auto-Close เปลี่ยนสีเทาอัตโนมัติเมื่อหมดเวลา (บังคับโซนเวลาไทย 'Asia/Bangkok')
+        // ==========================================
+        $nowAuto   = Carbon::now('Asia/Bangkok');
+        $todayAuto = $nowAuto->format('Y-m-d');
+        $timeAuto  = $nowAuto->format('H:i:s');
+
+        if (class_exists(Checkin::class)) {
+            $expiredCheckins = Checkin::whereNull('checkout_at')->get();
+            foreach ($expiredCheckins as $ck) {
+                $sch = null;
+                if ($ck->schedule_id) {
+                    $sch = Schedule::find($ck->schedule_id);
+                }
+                if ($sch) {
+                    // คำนวณวันและเวลาที่สิ้นสุดของตารางเวรแบบแม่นยำ
+                    $schEndDT = Carbon::parse($sch->schedule_date . ' ' . $sch->end_time, 'Asia/Bangkok');
+                    // ถ้าเวลาปัจจุบัน >= เวลาหมดเวร ให้ Check-out และปิดเคาน์เตอร์ทันที!
+                    if ($nowAuto->greaterThanOrEqualTo($schEndDT)) {
+                        $ck->checkout_at = $nowAuto;
+                        $ck->duration_min = $nowAuto->diffInMinutes(Carbon::parse($ck->checkin_at));
+                        $ck->is_kicked = 1; // บันทึกว่าปิดอัตโนมัติ
+                        $ck->save();
+                        
+                        $sch->status = 'empty';
+                        $sch->save();
+                    }
+                }
+            }
+        }
+        
+        // เคลียร์คิวอื่นๆ ที่อาจค้างสถานะ checkin แต่เวลาจบไปแล้ว ให้เป็น empty (สีเทา)
+        Schedule::whereIn('status', ['checkin', 'active'])
+            ->where(function ($q) use ($todayAuto, $timeAuto) {
+                $q->where('schedule_date', '<', $todayAuto)
+                  ->orWhere(function ($q2) use ($todayAuto, $timeAuto) {
+                      $q2->where('schedule_date', $todayAuto)
+                         ->where('end_time', '<=', $timeAuto);
+                  });
+            })->update(['status' => 'empty']);
+        // ==========================================
+
         $staffs = Staff::all();
         $weekOffset = (int) $request->query('week_offset', 0);
-        $startOfWeek = Carbon::now()->addWeeks($weekOffset)->startOfWeek();
+        $startOfWeek = Carbon::now('Asia/Bangkok')->addWeeks($weekOffset)->startOfWeek();
         $endOfWeek = $startOfWeek->copy()->endOfWeek();
         
         $weekDays = [];
@@ -144,7 +183,6 @@ class ScheduleController extends Controller
 
         foreach ($counters as $counter) {
             foreach ($counter->countersubs as $sub) {
-                // อัปเดตสถานะจริงของแต่ละตารางจากฐานข้อมูลก่อนจัดกลุ่ม
                 foreach ($sub->schedules as $schItem) {
                     if ($this->isScheduleCheckedIn($schItem, $sub)) {
                         $schItem->status = 'checkin';
@@ -173,7 +211,6 @@ class ScheduleController extends Controller
                             $sEnd   = Carbon::parse($potentialSub->end_time);
 
                             if ($sStart->lt($pEnd) && $sEnd->gt($pStart)) {
-                                // ถ้าคนแทนทำการ Check-in ให้การ์ดหลักแสดงสถานะ Check-in ด้วย
                                 if (strtolower($potentialSub->status ?? '') === 'checkin' && strtolower($sch->status ?? '') !== 'sick') {
                                     $sch->status = 'checkin';
                                 }
@@ -260,7 +297,7 @@ class ScheduleController extends Controller
                 if ($primaryConflict) {
                     $staffName = $primaryConflict->staff->staff_name ?? 'บุคลากรนี้';
                     $cTime = substr($primaryConflict->start_time, 0, 5) . '–' . substr($primaryConflict->end_time, 0, 5);
-                    return redirect()->back()->withErrors(["Conflict! {$staffName} มี slot ช่วงเวลาเดียวกัน ({$cTime}) ในวันที่ {$dateStr} — กรุณาเปลี่ยนเวลาหรือเลือกคนอื่น"]);
+                    return redirect()->back()->withErrors(["Conflict! {$staffName} มี slot ช่วงเวลาเดียวกัน ({$cTime}) ในวันที่ {$dateStr}"]);
                 }
 
                 if ($request->filled('substitute_staff_id')) {
@@ -285,7 +322,6 @@ class ScheduleController extends Controller
         return DB::transaction(function () use ($request, $startDate, $endDate, $selectedDays) {
             for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
                 if (in_array($date->dayOfWeek, $selectedDays)) {
-                    
                     $newSchedule = new Schedule();
                     if ($request->has('counter_sub_id')) { $newSchedule->counter_sub_id = $request->counter_sub_id; }
                     $newSchedule->staff_id      = $request->staff_id;
@@ -307,7 +343,7 @@ class ScheduleController extends Controller
                     }
                 }
             }
-            return redirect()->back()->with('success', 'เพิ่มตารางปฏิบัติงานเรียบร้อยแล้วครับ');
+            return redirect()->back()->with('success', 'เพิ่มตารางปฏิบัติงานเรียบร้อย');
         });
     }
 
@@ -335,7 +371,7 @@ class ScheduleController extends Controller
             if ($conflict) {
                 $staffName = $conflict->staff->staff_name ?? 'บุคลากรนี้';
                 $cTime = substr($conflict->start_time, 0, 5) . '–' . substr($conflict->end_time, 0, 5);
-                return redirect()->back()->withErrors(["Conflict! {$staffName} มี slot ช่วงเวลาเดียวกัน ({$cTime}) อยู่แล้ว ไม่สามารถแก้ไขเวลาทับซ้อนได้"]);
+                return redirect()->back()->withErrors(["Conflict! {$staffName} มี slot ช่วงเวลาเดียวกัน ({$cTime}) อยู่แล้ว"]);
             }
         }
 
@@ -352,12 +388,69 @@ class ScheduleController extends Controller
         });
     }
 
+    /**
+     * ลบตารางเวรและคนสำรอง โดยป้องกันปัญหารหัสอ้างอิงและรักษาประวัติรีวิวไว้ตลอดกาล
+     */
     public function destroy($schedule_id)
     {
         return DB::transaction(function () use ($schedule_id) {
             $schedule = Schedule::findOrFail($schedule_id);
+
+            // 1. ค้นหาคนสำรองทั้งหมดที่มีช่วงเวลาทับซ้อนกับ Slot หลัก
+            $substitutes = Schedule::where('counter_sub_id', $schedule->counter_sub_id)
+                ->where('schedule_date', $schedule->schedule_date)
+                ->where('schedule_id', '!=', $schedule_id)
+                ->where(function ($q) use ($schedule) {
+                    $q->where('start_time', '<', $schedule->end_time)
+                      ->where('end_time', '>', $schedule->start_time);
+                })->get();
+
+            // รวบรวม ID ของตารางเวรทั้งหมดที่จะถูกลบทิ้ง
+            $scheduleIdsToUnlink = $substitutes->pluck('schedule_id')->toArray();
+            $scheduleIdsToUnlink[] = $schedule_id;
+
+            if (class_exists(Checkin::class)) {
+                // 2. ดึงข้อมูล Check-in ทั้งหมดที่เคยอ้างอิงถึงตารางเวรกลุ่มนี้
+                $oldCheckins = Checkin::whereIn('schedule_id', $scheduleIdsToUnlink)->get();
+                $checkinIdsToDelete = $oldCheckins->pluck('checkin_id')->toArray();
+
+                if (!empty($checkinIdsToDelete)) {
+                    // 3. ก่อนที่จะลบ Check-in ให้ย้ายประวัติการประเมิน (Evaluation) ไปผูกกับพนักงานแทน เพื่อให้รีวิวไม่หายไป!
+                    if (class_exists(Evaluation::class)) {
+                        $evals = Evaluation::whereIn('checkin_id', $checkinIdsToDelete)->get();
+                        foreach ($evals as $ev) {
+                            $ck = $oldCheckins->firstWhere('checkin_id', $ev->checkin_id);
+                            if ($ck) {
+                                // ก็อปปี้รหัสพนักงานและเคาน์เตอร์ลงไปเก็บในตารางรีวิว
+                                if (Schema::hasColumn('evaluation', 'staff_id') && empty($ev->staff_id)) {
+                                    $ev->staff_id = $ck->staff_id;
+                                }
+                                if (Schema::hasColumn('evaluation', 'counter_sub_id') && empty($ev->counter_sub_id)) {
+                                    $ev->counter_sub_id = $schedule->counter_sub_id;
+                                }
+                            }
+                            try {
+                                // ปลดล็อก checkin_id เพื่อไม่ให้โดนลบตาม
+                                $ev->checkin_id = null;
+                                $ev->save();
+                            } catch (\Exception $e) {}
+                        }
+                    }
+
+                    // 4. ลบประวัติ Check-in ทิ้งเลย! แก้ปัญหา 1048 Column 'schedule_id' cannot be null ได้ 100%
+                    Checkin::whereIn('schedule_id', $scheduleIdsToUnlink)->delete();
+                }
+            }
+
+            // 5. ลบ Slot ของคนสำรองทั้งหมด
+            foreach ($substitutes as $sub) {
+                $sub->delete();
+            }
+
+            // 6. ลบ Slot หลัก
             $schedule->delete();
-            return redirect()->back()->with('success', 'ลบข้อมูลตารางปฏิบัติงานเรียบร้อยแล้ว');
+
+            return redirect()->back()->with('success', 'ลบข้อมูลตารางปฏิบัติงานและคนสำรองเรียบร้อยแล้ว');
         });
     }
 
@@ -395,9 +488,9 @@ class ScheduleController extends Controller
             fclose($handle);
 
             if($importedCount > 0) {
-                return redirect()->back()->with('success', "นำเข้าตารางปฏิบัติงานสำเร็จจำนวน $importedCount รายการ 100%!");
+                return redirect()->back()->with('success', "นำเข้าตารางปฏิบัติงานสำเร็จจำนวน $importedCount รายการ");
             } else {
-                return redirect()->back()->withErrors(['ไม่พบข้อมูลที่ถูกต้องในไฟล์ กรุณาตรวจสอบรูปแบบคอลัมน์']);
+                return redirect()->back()->withErrors(['ไม่พบข้อมูลที่ถูกต้องในไฟล์']);
             }
         });
     }

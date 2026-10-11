@@ -16,12 +16,46 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+    /**
+     * ดึงข้อมูลและแสดงผลหน้า Dashboard หลัก
+     */
     public function index(Request $request)
     {
         $period   = $request->query('period', 'today');
         $today    = Carbon::today();
         $todayStr = $today->format('Y-m-d');
         $nowTime  = Carbon::now()->format('H:i:s');
+
+        // ==========================================
+        // ระบบ Auto-Close ปิดเคาน์เตอร์และเปลี่ยนเป็นสีเทาอัตโนมัติเมื่อหมดเวลา
+        // ==========================================
+        $nowAuto   = Carbon::now();
+        $timeAuto  = $nowAuto->format('H:i:s');
+
+        if (class_exists(Checkin::class)) {
+            $expiredCheckins = Checkin::whereNull('checkout_at')->whereNotNull('schedule_id')->get();
+            foreach ($expiredCheckins as $ck) {
+                $sch = Schedule::find($ck->schedule_id);
+                if ($sch && ($sch->schedule_date < $todayStr || ($sch->schedule_date === $todayStr && $sch->end_time <= $timeAuto))) {
+                    $ck->checkout_at = $nowAuto;
+                    $ck->duration_min = $nowAuto->diffInMinutes(Carbon::parse($ck->checkin_at));
+                    $ck->save();
+                    
+                    $sch->status = 'empty';
+                    $sch->save();
+                }
+            }
+        }
+        
+        Schedule::where('status', 'checkin')
+            ->where(function ($q) use ($todayStr, $timeAuto) {
+                $q->where('schedule_date', '<', $todayStr)
+                  ->orWhere(function ($q2) use ($todayStr, $timeAuto) {
+                      $q2->where('schedule_date', $todayStr)
+                         ->where('end_time', '<=', $timeAuto);
+                  });
+            })->update(['status' => 'empty']);
+        // ==========================================
 
         // 1. เตรียมข้อมูล Counter, CounterSub, Staff และ Schedule ทั้งหมด
         $counters = Counter::with('countersubs')->where('is_active', true)->get();
@@ -49,7 +83,7 @@ class DashboardController extends Controller
         }
 
         // ดึงข้อมูล Checkin ทั้งหมดมาทำ Map คู่กับ checkin_id
-        $allCheckins = Checkin::all();
+        $allCheckins = class_exists(Checkin::class) ? Checkin::all() : collect();
         $checkinMap = $allCheckins->keyBy('checkin_id');
 
         // ดึงรายการ Checkin ที่กำลัง Active อยู่ตอนนี้ (checkout_at IS NULL)
@@ -66,6 +100,7 @@ class DashboardController extends Controller
             $scoreVal   = (float) ($ev->rating ?? $ev->score ?? 0);
             $commentVal = trim((string) ($ev->comment ?? ''));
 
+            // ดึง Check-in ที่ผูกกับ Evaluation นี้
             $linkedCheckin = ($ev->checkin_id && isset($checkinMap[$ev->checkin_id]))
                 ? $checkinMap[$ev->checkin_id]
                 : null;
@@ -92,8 +127,8 @@ class DashboardController extends Controller
                 }
             }
 
-            // วันเวลาที่ประเมิน (ใช้ created_at ของ evaluation หรือใช้เวลา checkin_at จากตาราง checkin)
-            $dateSource = $ev->created_at ?? ($linkedCheckin ? $linkedCheckin->checkin_at : null) ?? now();
+            // วันเวลาที่ประเมิน (ให้ความสำคัญกับ created_at ใน evaluation ก่อน แล้วค่อย fallback ไปที่ checkin_at)
+            $dateSource = $ev->created_at ?? $ev->evaluation_date ?? ($linkedCheckin ? $linkedCheckin->checkin_at : null) ?? now();
             $resolvedDate = Carbon::parse($dateSource);
 
             $resolvedCounterId = ($resolvedSubId && isset($subCounterMap[$resolvedSubId]))
@@ -206,9 +241,9 @@ class DashboardController extends Controller
                         ?? $subSchedules->first();
                 }
 
-                // ดึงรายการประเมินของเคาน์เตอร์ย่อยนี้ (หรือของพนักงานที่นั่งอยู่เคาน์เตอร์ย่อยนี้)
                 $currentStaffId = $activeCk ? $activeCk->staff_id : ($activeSch ? $activeSch->staff_id : null);
 
+                // ดึงรายการประเมินของเคาน์เตอร์ย่อยนี้ (หรือของพนักงานที่นั่งอยู่เคาน์เตอร์ย่อยนี้)
                 $subEvals = $filteredEvals->filter(function ($e) use ($sub, $currentStaffId) {
                     if ($e->counter_sub_id !== null && (int) $e->counter_sub_id === (int) $sub->counter_sub_id) {
                         return true;
@@ -274,7 +309,7 @@ class DashboardController extends Controller
                 ];
             }
 
-            // คำนวณคะแนนเฉลี่ยรายเคาน์เตอร์หลัก (เคาน์เตอร์ 1, เคาน์เตอร์ 2, ...)
+            // คำนวณคะแนนเฉลี่ยรายเคาน์เตอร์หลัก
             $cSubIds = $counter->countersubs->pluck('counter_sub_id')->map(fn($id) => (int) $id)->toArray();
             $cEvals  = $filteredEvals->filter(function ($e) use ($counter, $cSubIds) {
                 return ($e->counter_id !== null && (int) $e->counter_id === (int) $counter->counter_id)
@@ -291,7 +326,6 @@ class DashboardController extends Controller
             ];
         }
 
-        // นับจำนวน Staff ที่กำลัง Check-in จริง
         $staffCheckinCount = collect($activeCheckinStaffs)->pluck('staff_id')->unique()->count();
 
         // ==========================================
@@ -327,7 +361,7 @@ class DashboardController extends Controller
         })->sortByDesc('avg_score')->values();
 
         $highestStaff = $rankedStaffs->first();
-        // แสดงช่อง "ต้องปรับปรุง" เฉพาะเมื่อมีบุคลากรที่ถูกประเมินมากกว่า 1 คนขึ้นไป (ไม่เอาคนเดียวกันมาแสดงซ้ำ)
+        // ไม่นำคนที่มีคะแนนสูงสุดมาแสดงซ้ำในช่อง "ต้องปรับปรุง"
         $lowestStaff  = $rankedStaffs->count() > 1 ? $rankedStaffs->last() : null;
 
         // ==========================================
@@ -363,5 +397,157 @@ class DashboardController extends Controller
             'counterAvgScores',
             'recentComments'
         ));
+    }
+
+    /**
+     * API ดึงข้อมูลรีวิวล่าสุดแบบ Real-time โดยไม่ต้องรีเฟรชสำหรับหน้า Check-in
+     */
+    public function getMyReviews(Request $request)
+    {
+        $staffId   = $request->query('staff_id');
+        $staffName = trim((string) $request->query('staff_name', ''));
+        $subCode   = trim((string) $request->query('counter_code', ''));
+
+        // ==========================================
+        // Auto-Close ทำงานเบื้องหลังทุก 3 วินาทีตามจังหวะ Polling ของหน้า Check-in
+        // ==========================================
+        $nowAuto   = Carbon::now();
+        $todayStr  = $nowAuto->format('Y-m-d');
+        $timeAuto  = $nowAuto->format('H:i:s');
+
+        if (class_exists(Checkin::class)) {
+            $expiredCheckins = Checkin::whereNull('checkout_at')->whereNotNull('schedule_id')->get();
+            foreach ($expiredCheckins as $ck) {
+                $sch = Schedule::find($ck->schedule_id);
+                if ($sch && ($sch->schedule_date < $todayStr || ($sch->schedule_date === $todayStr && $sch->end_time <= $timeAuto))) {
+                    $ck->checkout_at = $nowAuto;
+                    $ck->duration_min = $nowAuto->diffInMinutes(Carbon::parse($ck->checkin_at));
+                    $ck->save();
+                    
+                    $sch->status = 'empty';
+                    $sch->save();
+                }
+            }
+        }
+        Schedule::where('status', 'checkin')
+            ->where(function ($q) use ($todayStr, $timeAuto) {
+                $q->where('schedule_date', '<', $todayStr)
+                  ->orWhere(function ($q2) use ($todayStr, $timeAuto) {
+                      $q2->where('schedule_date', $todayStr)
+                         ->where('end_time', '<=', $timeAuto);
+                  });
+            })->update(['status' => 'empty']);
+        // ==========================================
+
+        $staff = null;
+        if ($staffId) {
+            $staff = Staff::find($staffId);
+        } elseif ($staffName !== '') {
+            $staff = Staff::where('staff_name', $staffName)->first();
+        }
+        if ($staff) {
+            $staffId = $staff->staff_id;
+        }
+
+        $counters = Counter::with('countersubs')->where('is_active', true)->get();
+        $subCounterMap = [];
+        $codeToSubIdMap = [];
+
+        foreach ($counters as $counter) {
+            $sIdx = 1;
+            foreach ($counter->countersubs as $sub) {
+                $code = $counter->counter_id . '.' . $sIdx++;
+                $subCounterMap[$sub->counter_sub_id] = [
+                    'code'       => $code,
+                    'location'   => $counter->counter_location,
+                    'counter_id' => $counter->counter_id
+                ];
+                $codeToSubIdMap[$code] = $sub->counter_sub_id;
+            }
+        }
+
+        $targetSubId = $codeToSubIdMap[$subCode] ?? null;
+
+        $allSchedules = Schedule::with('staff')->orderBy('schedule_date', 'desc')->get();
+        $allSchedulesMap = $allSchedules->keyBy('schedule_id');
+        $todaySchedules = Schedule::with('staff')->where('schedule_date', $todayStr)->get();
+
+        if (!$targetSubId && $staffId) {
+            $mySch = $todaySchedules->where('staff_id', $staffId)->first()
+                ?? $allSchedules->where('staff_id', $staffId)->first();
+            if ($mySch) {
+                $targetSubId = $mySch->counter_sub_id;
+                $subCode = $subCounterMap[$targetSubId]['code'] ?? $subCode;
+            }
+        }
+
+        $allCheckins = class_exists(Checkin::class) ? Checkin::all() : collect();
+        $checkinMap = $allCheckins->keyBy('checkin_id');
+
+        $evalTable = null;
+        foreach (['evaluation', 'evaluations', 'satisfaction', 'satisfactions', 'review', 'reviews'] as $tbl) {
+            if (Schema::hasTable($tbl)) {
+                $evalTable = $tbl;
+                break;
+            }
+        }
+
+        $myReviews = collect();
+
+        if ($evalTable) {
+            $rawEvals = DB::table($evalTable)->orderBy('evaluation_id', 'asc')->get();
+
+            foreach ($rawEvals as $ev) {
+                $scoreVal   = (float) ($ev->rating ?? $ev->score ?? 0);
+                $commentVal = trim((string) ($ev->comment ?? ''));
+
+                $linkedCheckin = ($ev->checkin_id && isset($checkinMap[$ev->checkin_id])) ? $checkinMap[$ev->checkin_id] : null;
+
+                $resolvedStaffId    = $ev->staff_id ?? ($linkedCheckin ? $linkedCheckin->staff_id : null);
+                $resolvedScheduleId = $ev->schedule_id ?? ($linkedCheckin ? $linkedCheckin->schedule_id : null);
+                $resolvedSubId      = $ev->counter_sub_id ?? null;
+
+                if (!$resolvedSubId && $resolvedScheduleId && isset($allSchedulesMap[$resolvedScheduleId])) {
+                    $linkedSch = $allSchedulesMap[$resolvedScheduleId];
+                    $resolvedSubId = $linkedSch->counter_sub_id;
+                    if (!$resolvedStaffId) $resolvedStaffId = $linkedSch->staff_id;
+                }
+
+                if (!$resolvedSubId && $resolvedStaffId) {
+                    $staffSch = $todaySchedules->where('staff_id', $resolvedStaffId)->first()
+                        ?? $allSchedules->where('staff_id', $resolvedStaffId)->first();
+                    if ($staffSch) {
+                        $resolvedSubId = $staffSch->counter_sub_id;
+                    }
+                }
+
+                $dateSource = $ev->created_at ?? $ev->evaluation_date ?? ($linkedCheckin ? $linkedCheckin->checkin_at : null) ?? now();
+                $resolvedDate = Carbon::parse($dateSource);
+
+                $isMatch = false;
+                if ($staffId && $resolvedStaffId && (int) $resolvedStaffId === (int) $staffId) {
+                    $isMatch = true;
+                } elseif ($targetSubId && $resolvedSubId && (int) $resolvedSubId === (int) $targetSubId) {
+                    $isMatch = true;
+                }
+
+                if ($isMatch) {
+                    $timeDisplay = $resolvedDate->format('H:i:s') !== '00:00:00' ? $resolvedDate->format('H:i') : Carbon::now()->format('H:i');
+                    $myReviews->push([
+                        'score'       => (int) round($scoreVal),
+                        'is_negative' => $scoreVal <= 2.0,
+                        'comment'     => $commentVal !== '' ? $commentVal : 'ไม่มีความคิดเห็นเพิ่มเติม',
+                        'date_time'   => $resolvedDate->translatedFormat('j M.') . ' - ' . $timeDisplay . ' น.'
+                    ]);
+                }
+            }
+        }
+
+        $reversedReviews = $myReviews->reverse()->values();
+
+        return response()->json([
+            'ok'      => true,
+            'reviews' => $reversedReviews
+        ]);
     }
 }
