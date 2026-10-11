@@ -914,7 +914,7 @@
             } else {
                 // กรณีในฐานข้อมูลเป็น 'waiting' หรือ 'empty' (ยังไม่ได้ Check-in)
                 if (now > slotEnd) {
-                    statusEl.innerText = 'สิ้นสุดเวลา (ไม่ได้ Check-in)';
+                    statusEl.innerText = 'สิ้นสุดเวลา';
                     statusEl.style.color = '#718096';
                     cardBox.style.background = '#f7fafc';
                     cardBox.style.borderColor = '#e2e8f0';

@@ -27,6 +27,21 @@ class Staff extends Authenticatable
         return $this->password;
     }
 
+    public function getEmailForPasswordReset()
+    {
+        return $this->staff_email;
+    }
+
+    public function routeNotificationForMail($notification = null)
+    {
+        return $this->staff_email;
+    }
+
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new \App\Notifications\ResetPasswordNotification($token));
+    }
+
 
     protected $fillable = [
         'staff_name',

@@ -17,16 +17,18 @@ class CheckinController extends Controller
     private $libraryName = 'สำนักหอสมุด มหาวิทยาลัย';
 
     /**
-     * ฟังก์ชันกลางสำหรับเตรียมข้อมูลและแสดงหน้า Step 4 (Check-in สำเร็จ + รีวิวของฉัน)
+     * ฟังก์ชันตัวช่วยสำหรับสร้างหน้า Step 4
      */
     private function renderStep4View($checkin, $counterId)
     {
+        $nowBkk = Carbon::now('Asia/Bangkok');
         $staff = Staff::where('staff_id', $checkin->staff_id)->first();
+        
         $schedule = $checkin->schedule_id
             ? Schedule::where('schedule_id', $checkin->schedule_id)->first()
             : Schedule::where('counter_sub_id', $counterId)
                 ->where('staff_id', $checkin->staff_id)
-                ->where('schedule_date', now()->toDateString())
+                ->where('schedule_date', $nowBkk->toDateString())
                 ->first();
 
         $counterSub = CounterSub::with('counter')->where('counter_sub_id', $counterId)->first();
@@ -45,11 +47,10 @@ class CheckinController extends Controller
 
         $showWarningBar = false;
         if ($schedule) {
-            $timeEnd = Carbon::parse($schedule->end_time);
-            $showWarningBar = now()->diffInMinutes($timeEnd, false) <= 15 && now()->isBefore($timeEnd);
+            $timeEnd = Carbon::parse($schedule->schedule_date . ' ' . $schedule->end_time, 'Asia/Bangkok');
+            $showWarningBar = $nowBkk->diffInMinutes($timeEnd, false) <= 15 && $nowBkk->isBefore($timeEnd);
         }
 
-        // ดึงรายการประเมินทั้งหมดของพนักงานคนนี้ เรียงจากใหม่ล่าสุดขึ้นก่อน
         $evaluations = collect([]);
         if (class_exists(Evaluation::class) && $staff) {
             $evaluations = Evaluation::whereIn('checkin_id', function ($query) use ($staff) {
@@ -69,7 +70,7 @@ class CheckinController extends Controller
             'current_counter_average' => $avgRating,
         ];
 
-        $checkinFallbackTime = $checkin->checkin_at ?? now();
+        $checkinFallbackTime = $checkin->checkin_at ?? $nowBkk;
 
         $reviewsList = $evaluations->map(function ($eval) use ($checkinFallbackTime) {
             $dateSource = $eval->created_at ?? $eval->evaluation_date ?? $checkinFallbackTime;
@@ -97,7 +98,43 @@ class CheckinController extends Controller
 
     public function index(Request $request)
     {
-        // รองรับการกด F5 รีเฟรชหน้า Step 4 โดยไม่สร้าง Check-in ซ้ำ และไม่เกิด MethodNotAllowed
+        $nowBkk = Carbon::now('Asia/Bangkok');
+        $todayAuto = $nowBkk->format('Y-m-d');
+        $timeAuto  = $nowBkk->format('H:i:s');
+
+        // ==========================================
+        // 1. ระบบ Auto-Close บังคับเช็คเอาท์และเปลี่ยนตารางเป็นสีเทาเมื่อหมดเวลา
+        // ==========================================
+        if (class_exists(Checkin::class)) {
+            $expiredCheckins = Checkin::whereNull('checkout_at')->get();
+            foreach ($expiredCheckins as $ck) {
+                $sch = $ck->schedule_id ? Schedule::find($ck->schedule_id) : null;
+                if ($sch) {
+                    $schEndDT = Carbon::parse($sch->schedule_date . ' ' . $sch->end_time, 'Asia/Bangkok');
+                    if ($nowBkk->greaterThanOrEqualTo($schEndDT)) {
+                        $ck->checkout_at = $nowBkk;
+                        $ck->duration_min = $nowBkk->diffInMinutes(Carbon::parse($ck->checkin_at));
+                        $ck->is_kicked = 1;
+                        $ck->save();
+                        
+                        $sch->status = 'empty';
+                        $sch->save();
+                    }
+                }
+            }
+        }
+
+        // เคลียร์คิวอื่นๆ ที่อาจค้างสถานะ checkin/active แต่เวลาหมดไปแล้ว ให้เป็น empty (สีเทา)
+        Schedule::whereIn('status', ['checkin', 'active', 'waiting'])
+            ->where(function ($q) use ($todayAuto, $timeAuto) {
+                $q->where('schedule_date', '<', $todayAuto)
+                  ->orWhere(function ($q2) use ($todayAuto, $timeAuto) {
+                      $q2->where('schedule_date', $todayAuto)
+                         ->where('end_time', '<=', $timeAuto);
+                  });
+            })->update(['status' => 'empty']);
+        // ==========================================
+
         if ($request->has('active_checkin_id')) {
             $activeCheckin = Checkin::where('checkin_id', $request->active_checkin_id)
                 ->whereNull('checkout_at')
@@ -126,26 +163,53 @@ class CheckinController extends Controller
 
         foreach ($counters as $counter) {
             foreach ($counter->countersubs as $sub) {
+                // ดึงเฉพาะตารางเวรของวันนี้
                 $schedules = Schedule::where('counter_sub_id', $sub->counter_sub_id)
-                    ->where('schedule_date', now()->toDateString())
+                    ->where('schedule_date', $todayAuto)
+                    ->orderBy('start_time', 'asc')
                     ->get();
 
                 $scheduleIds = $schedules->pluck('schedule_id');
                 $hasActiveCheckin = false;
+                $activeCk = null;
 
+                // เช็คว่ามีใคร Check-in ค้างอยู่ในเคาน์เตอร์นี้หรือไม่
                 if ($scheduleIds->isNotEmpty()) {
-                    $hasActiveCheckin = Checkin::whereIn('schedule_id', $scheduleIds)
+                    $activeCk = Checkin::whereIn('schedule_id', $scheduleIds)
                         ->whereNull('checkout_at')
-                        ->exists();
+                        ->first();
+                    if ($activeCk) {
+                        $hasActiveCheckin = true;
+                    }
                 }
 
-                $firstSchedule = $schedules->first();
+                // หาคิวงานที่ยังไม่หมดเวลา (ดึงจากเวลาไทยแบบเรียลไทม์)
+                $validSchedule = $schedules->first(function ($sch) use ($timeAuto) {
+                    $status = strtolower(trim($sch->status ?? 'empty'));
+                    return $sch->end_time > $timeAuto && !in_array($status, ['close', 'sick']);
+                });
+
+                // =====================================
+                // 2. ถ้าไม่มีพนักงาน Check-in ค้างอยู่ และเลยเวลาหมดเวร (end_time) ของคิวไปแล้ว
+                // ให้ซ่อนหน้าต่างเคาน์เตอร์นี้ทิ้งทันที 100% ไม่แสดงบนหน้าเว็บ!
+                // =====================================
+                if (!$hasActiveCheckin && !$validSchedule) {
+                    continue; 
+                }
+
+                $displaySchedule = null;
+                if ($hasActiveCheckin && $activeCk) {
+                    $displaySchedule = $schedules->firstWhere('schedule_id', $activeCk->schedule_id);
+                }
+                if (!$displaySchedule) {
+                    $displaySchedule = $validSchedule ?? $schedules->last();
+                }
 
                 $countersList->push((object)[
                     'id'           => $sub->counter_sub_id,
                     'name'         => 'เคาน์เตอร์ ' . $counter->counter_id . '.' . $sub->counter_sub_id,
-                    'time_start'   => $firstSchedule ? substr($firstSchedule->start_time, 0, 5) : '-',
-                    'time_end'     => $firstSchedule ? substr($firstSchedule->end_time, 0, 5) : '-',
+                    'time_start'   => $displaySchedule ? substr($displaySchedule->start_time, 0, 5) : '-',
+                    'time_end'     => $displaySchedule ? substr($displaySchedule->end_time, 0, 5) : '-',
                     'is_available' => !$hasActiveCheckin,
                 ]);
             }
@@ -177,13 +241,22 @@ class CheckinController extends Controller
             return back()->withErrors(['pin' => 'PIN ไม่ถูกต้อง']);
         }
 
+        $nowBkk = Carbon::now('Asia/Bangkok');
+        $todayAuto = $nowBkk->format('Y-m-d');
+        $timeAuto  = $nowBkk->format('H:i:s');
+        
+        // =====================================
+        // 3. ดักป้องกันอีกชั้น: ถ้ารหัสถูก แต่เลยเวลา end_time ไปแล้ว บล็อกไม่ให้เข้า 100%!
+        // =====================================
         $schedule = Schedule::where('counter_sub_id', $request->counter_id)
             ->where('staff_id', $staff->staff_id)
-            ->where('schedule_date', now()->toDateString())
+            ->where('schedule_date', $todayAuto)
+            ->where('end_time', '>', $timeAuto)
+            ->whereNotIn('status', ['close', 'sick'])
             ->first();
 
         $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
-            ->where('schedule_date', now()->toDateString())
+            ->where('schedule_date', $todayAuto)
             ->pluck('schedule_id');
 
         $activeCheckin = null;
@@ -191,6 +264,11 @@ class CheckinController extends Controller
             $activeCheckin = Checkin::whereIn('schedule_id', $allSchedulesToday)
                 ->whereNull('checkout_at')
                 ->first();
+        }
+
+        // หากหมดเวลาและไม่ได้เป็นคนที่ Check-in ค้างไว้อยู่เดิม ให้ดีดกลับพร้อมแจ้งเตือนทันที!
+        if (!$schedule && !($activeCheckin && $activeCheckin->staff_id === $staff->staff_id)) {
+            return back()->withErrors(['pin' => 'ไม่สามารถ Check-in ได้ เนื่องจากหมดเวลาปฏิบัติงานแล้ว หรือไม่มีตารางเวรในขณะนี้']);
         }
 
         $currentStaffName = null;
@@ -231,17 +309,22 @@ class CheckinController extends Controller
             'staff_id'   => 'required'
         ]);
 
+        $nowBkk = Carbon::now('Asia/Bangkok');
+        $todayAuto = $nowBkk->format('Y-m-d');
+        $timeAuto  = $nowBkk->format('H:i:s');
+
         $schedule = Schedule::where('counter_sub_id', $request->counter_id)
             ->where('staff_id', $request->staff_id)
-            ->where('schedule_date', now()->toDateString())
+            ->where('schedule_date', $todayAuto)
+            ->where('end_time', '>', $timeAuto)
+            ->whereNotIn('status', ['close', 'sick'])
             ->first();
 
-        $newCheckin = DB::transaction(function () use ($request, $schedule) {
+        $newCheckin = DB::transaction(function () use ($request, $schedule, $nowBkk, $todayAuto) {
             $allSchedulesToday = Schedule::where('counter_sub_id', $request->counter_id)
-                ->where('schedule_date', now()->toDateString())
+                ->where('schedule_date', $todayAuto)
                 ->pluck('schedule_id');
 
-            // 1. เช็คว่าพนักงานคนนี้มีรายการ Check-in ที่ยังไม่ได้ Check-out อยู่แล้วหรือไม่
             $existingSelfCheckin = Checkin::where('staff_id', $request->staff_id)
                 ->whereNull('checkout_at')
                 ->when($schedule, function ($q) use ($schedule) {
@@ -250,14 +333,13 @@ class CheckinController extends Controller
                 ->latest('checkin_id')
                 ->first();
 
-            // 2. ล้างแถวที่เคยเผลอกด F5 เบิ้ลซ้ำ (is_kicked = 1 ของตัวเองในวันนี้) โดยย้าย Evaluation มารวมที่แถวหลักก่อนลบ
             $targetMainCheckinId = $existingSelfCheckin ? $existingSelfCheckin->checkin_id : null;
 
             if ($existingSelfCheckin) {
                 $duplicateIds = Checkin::where('staff_id', $request->staff_id)
                     ->where('checkin_id', '!=', $targetMainCheckinId)
                     ->where('is_kicked', 1)
-                    ->whereDate('checkin_at', now()->toDateString())
+                    ->whereDate('checkin_at', $todayAuto)
                     ->pluck('checkin_id');
 
                 if ($duplicateIds->isNotEmpty()) {
@@ -276,7 +358,6 @@ class CheckinController extends Controller
                 return $existingSelfCheckin;
             }
 
-            // 3. กรณีมีบุคลากร "คนอื่น" ค้างอยู่ที่เคาน์เตอร์นี้ ให้ทำการ Auto-Kick คนเก่าออก
             if ($allSchedulesToday->isNotEmpty()) {
                 $activeOtherCheckins = Checkin::whereIn('schedule_id', $allSchedulesToday)
                     ->where('staff_id', '!=', $request->staff_id)
@@ -284,8 +365,8 @@ class CheckinController extends Controller
                     ->get();
 
                 foreach ($activeOtherCheckins as $activeCheckin) {
-                    $activeCheckin->checkout_at = now();
-                    $activeCheckin->duration_min = now()->diffInMinutes(Carbon::parse($activeCheckin->checkin_at));
+                    $activeCheckin->checkout_at = $nowBkk;
+                    $activeCheckin->duration_min = $nowBkk->diffInMinutes(Carbon::parse($activeCheckin->checkin_at));
                     $activeCheckin->is_kicked = 1;
                     $activeCheckin->save();
 
@@ -297,20 +378,18 @@ class CheckinController extends Controller
                 }
             }
 
-            // 4. สร้างรายการ Check-in ใหม่
             $checkin = new Checkin();
             $checkin->schedule_id = $schedule ? $schedule->schedule_id : null;
             $checkin->staff_id = $request->staff_id;
-            $checkin->checkin_at = now();
+            $checkin->checkin_at = $nowBkk;
             $checkin->is_substitute = 0;
             $checkin->is_kicked = 0;
             $checkin->save();
 
-            // ยุบรวมแถวที่เคยเบิ้ลซ้ำของวันนี้ (ถ้ามี) มาไว้ที่รายการใหม่นี้
             $oldDupIds = Checkin::where('staff_id', $request->staff_id)
                 ->where('checkin_id', '!=', $checkin->checkin_id)
                 ->where('is_kicked', 1)
-                ->whereDate('checkin_at', now()->toDateString())
+                ->whereDate('checkin_at', $todayAuto)
                 ->pluck('checkin_id');
 
             if ($oldDupIds->isNotEmpty()) {
@@ -329,7 +408,6 @@ class CheckinController extends Controller
             return $checkin;
         });
 
-        // Redirect ไปที่ GET /checkin?active_checkin_id=... เพื่อป้องกันปัญหา MethodNotAllowed และการส่ง POST ซ้ำเมื่อกด F5 100%!
         return redirect()->route('checkin.index', [
             'active_checkin_id' => $newCheckin->checkin_id,
             'c_id'              => $request->counter_id
@@ -340,10 +418,11 @@ class CheckinController extends Controller
     {
         $request->validate(['checkin_id' => 'required']);
 
+        $nowBkk = Carbon::now('Asia/Bangkok');
         $checkin = Checkin::where('checkin_id', $request->checkin_id)->first();
         if ($checkin) {
-            $checkin->checkout_at = now();
-            $checkin->duration_min = now()->diffInMinutes(Carbon::parse($checkin->checkin_at));
+            $checkin->checkout_at = $nowBkk;
+            $checkin->duration_min = $nowBkk->diffInMinutes(Carbon::parse($checkin->checkin_at));
             $checkin->is_kicked = 0;
             $checkin->save();
 

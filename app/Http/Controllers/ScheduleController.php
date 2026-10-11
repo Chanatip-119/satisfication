@@ -15,25 +15,17 @@ use Carbon\Carbon;
 
 class ScheduleController extends Controller
 {
-    /**
-     * ตรวจสอบจากฐานข้อมูลจริงว่า Slot ตารางปฏิบัติงานนี้มีการ Check-in อยู่หรือไม่
-     */
     private function isScheduleCheckedIn($sch, $sub = null)
     {
         $rawStatus = strtolower(trim($sch->status ?? 'empty'));
-
-        if (in_array($rawStatus, ['sick', 'close'])) {
-            return false;
-        }
-
-        if (in_array($rawStatus, ['checkin', 'check-in', 'checked_in', 'active', 'working'])) {
-            return true;
-        }
+        if (in_array($rawStatus, ['sick', 'close'])) return false;
+        if (in_array($rawStatus, ['checkin', 'check-in', 'checked_in', 'active', 'working'])) return true;
 
         foreach (['check_in_time', 'checkin_time', 'checked_in_at', 'checkin_at', 'time_in'] as $inCol) {
             if (!empty($sch->{$inCol})) {
                 $isCheckedOut = false;
-                foreach (['check_out_time', 'checkout_time', 'checked_out_at', 'checkout_at', 'time_out'] as $outCol) {
+                // เพิ่ม 'checkout_at' เข้าไปในอาร์เรย์ตรวจสอบแล้วครับ!
+                foreach (['checkout_at', 'checkout_time', 'check_out_time', 'checked_out_at', 'check_out_at', 'time_out'] as $outCol) {
                     if (!empty($sch->{$outCol})) {
                         $isCheckedOut = true;
                         break;
@@ -43,9 +35,9 @@ class ScheduleController extends Controller
             }
         }
 
-        // บังคับใช้ Timezone ไทยเพื่อความแม่นยำ 100%
-        $todayStr = Carbon::now('Asia/Bangkok')->format('Y-m-d');
-        $nowTime  = Carbon::now('Asia/Bangkok')->format('H:i:s');
+        $nowAuto  = Carbon::now('Asia/Bangkok');
+        $todayStr = $nowAuto->format('Y-m-d');
+        $nowTime  = $nowAuto->format('H:i:s');
 
         foreach (['checkin', 'checkins', 'check_in', 'check_ins', 'staff_checkin', 'staff_checkins', 'attendance', 'work_logs'] as $tbl) {
             if (Schema::hasTable($tbl)) {
@@ -71,7 +63,8 @@ class ScheduleController extends Controller
                 }
 
                 if ($matched) {
-                    foreach (['checkout_time', 'check_out_time', 'checked_out_at', 'check_out_at', 'time_out'] as $outCol) {
+                    // ตรงนี้สำคัญมาก เพิ่ม 'checkout_at' ให้มันดึงไปเช็คว่าต้องเป็น NULL เท่านั้น
+                    foreach (['checkout_at', 'checkout_time', 'check_out_time', 'checked_out_at', 'check_out_at', 'time_out'] as $outCol) {
                         if (in_array($outCol, $cols)) {
                             $q->whereNull($outCol);
                         }
@@ -79,29 +72,26 @@ class ScheduleController extends Controller
                     if (in_array('status', $cols)) {
                         $q->whereNotIn('status', ['checkout', 'check-out', 'checked_out', 'completed', 'close']);
                     }
-                    if ($q->exists()) {
-                        return true;
-                    }
+                    if ($q->exists()) return true;
                 }
             }
         }
 
-        if ($sch->schedule_date === $todayStr && $sch->start_time <= $nowTime && $sch->end_time >= $nowTime) {
-            if ($sub) {
-                $subStatus = strtolower(trim($sub->status ?? $sub->sub_status ?? ''));
-                if (in_array($subStatus, ['checkin', 'active', 'open', 'busy', 'working'])) {
-                    return true;
+        if ($sch->schedule_date === $todayStr) {
+            try {
+                $endStr = Carbon::parse($sch->end_time)->format('H:i:s');
+                $schEndDT = Carbon::parse($sch->schedule_date . ' ' . $endStr, 'Asia/Bangkok');
+                
+                if ($nowAuto->isBefore($schEndDT)) {
+                    if ($sub) {
+                        $subStatus = strtolower(trim($sub->status ?? $sub->sub_status ?? ''));
+                        if (in_array($subStatus, ['checkin', 'active', 'open', 'busy', 'working'])) return true;
+                        if (isset($sub->is_checkin) && $sub->is_checkin) return true;
+                        if (isset($sub->current_staff_id) && $sub->current_staff_id == $sch->staff_id) return true;
+                    }
+                    if ($rawStatus === 'waiting') return true;
                 }
-                if (isset($sub->is_checkin) && $sub->is_checkin) {
-                    return true;
-                }
-                if (isset($sub->current_staff_id) && $sub->current_staff_id == $sch->staff_id) {
-                    return true;
-                }
-            }
-            if ($rawStatus === 'waiting') {
-                return true;
-            }
+            } catch (\Exception $e) {}
         }
 
         return false;
@@ -110,45 +100,63 @@ class ScheduleController extends Controller
     public function index(Request $request)
     {
         // ==========================================
-        // ระบบ Auto-Close เปลี่ยนสีเทาอัตโนมัติเมื่อหมดเวลา (บังคับโซนเวลาไทย 'Asia/Bangkok')
+        // ระบบ Auto-Close เปลี่ยนสถานะเป็นสีเทา (ครอบ try-catch กันบั๊กเวลาเพี้ยน 100%)
         // ==========================================
         $nowAuto   = Carbon::now('Asia/Bangkok');
         $todayAuto = $nowAuto->format('Y-m-d');
-        $timeAuto  = $nowAuto->format('H:i:s');
 
-        if (class_exists(Checkin::class)) {
-            $expiredCheckins = Checkin::whereNull('checkout_at')->get();
-            foreach ($expiredCheckins as $ck) {
-                $sch = null;
-                if ($ck->schedule_id) {
-                    $sch = Schedule::find($ck->schedule_id);
-                }
-                if ($sch) {
-                    // คำนวณวันและเวลาที่สิ้นสุดของตารางเวรแบบแม่นยำ
-                    $schEndDT = Carbon::parse($sch->schedule_date . ' ' . $sch->end_time, 'Asia/Bangkok');
-                    // ถ้าเวลาปัจจุบัน >= เวลาหมดเวร ให้ Check-out และปิดเคาน์เตอร์ทันที!
-                    if ($nowAuto->greaterThanOrEqualTo($schEndDT)) {
-                        $ck->checkout_at = $nowAuto;
-                        $ck->duration_min = $nowAuto->diffInMinutes(Carbon::parse($ck->checkin_at));
-                        $ck->is_kicked = 1; // บันทึกว่าปิดอัตโนมัติ
-                        $ck->save();
+        try {
+            if (class_exists(Checkin::class)) {
+                $expiredCheckins = Checkin::whereNull('checkout_at')->get();
+                foreach ($expiredCheckins as $ck) {
+                    try {
+                        $sch = $ck->schedule_id ? Schedule::find($ck->schedule_id) : null;
                         
-                        $sch->status = 'empty';
-                        $sch->save();
-                    }
+                        if (!$sch && $ck->staff_id) {
+                            $sch = Schedule::where('staff_id', $ck->staff_id)
+                                           ->whereDate('schedule_date', '<=', $todayAuto)
+                                           ->orderBy('schedule_date', 'desc')
+                                           ->first();
+                        }
+
+                        if ($sch) {
+                            $schDate = Carbon::parse($sch->schedule_date)->format('Y-m-d');
+                            $endStr = Carbon::parse($sch->end_time)->format('H:i:s');
+                            $schEndDT = Carbon::parse($schDate . ' ' . $endStr, 'Asia/Bangkok');
+                            
+                            if ($nowAuto->greaterThanOrEqualTo($schEndDT)) {
+                                $ck->checkout_at = $nowAuto;
+                                $checkinAt = $ck->checkin_at ? Carbon::parse($ck->checkin_at) : $schEndDT->copy()->subMinutes(30);
+                                $ck->duration_min = $nowAuto->diffInMinutes($checkinAt);
+                                $ck->is_kicked = 1;
+                                $ck->save();
+                                
+                                $sch->status = 'empty';
+                                $sch->save();
+                            }
+                        }
+                    } catch (\Exception $e) { continue; }
                 }
             }
-        }
-        
-        // เคลียร์คิวอื่นๆ ที่อาจค้างสถานะ checkin แต่เวลาจบไปแล้ว ให้เป็น empty (สีเทา)
-        Schedule::whereIn('status', ['checkin', 'active'])
-            ->where(function ($q) use ($todayAuto, $timeAuto) {
-                $q->where('schedule_date', '<', $todayAuto)
-                  ->orWhere(function ($q2) use ($todayAuto, $timeAuto) {
-                      $q2->where('schedule_date', $todayAuto)
-                         ->where('end_time', '<=', $timeAuto);
-                  });
-            })->update(['status' => 'empty']);
+            
+            // เคลียร์คิวที่เลยเวลาแต่ยังค้างสถานะ checkin/active อยู่
+            $schedulesToClear = Schedule::whereDate('schedule_date', '<=', $todayAuto)
+                                        ->whereNotIn('status', ['empty', 'close', 'sick'])
+                                        ->get();
+                                        
+            foreach ($schedulesToClear as $stc) {
+                try {
+                    $schDate = Carbon::parse($stc->schedule_date)->format('Y-m-d');
+                    $endStr = Carbon::parse($stc->end_time)->format('H:i:s');
+                    $schEndDT = Carbon::parse($schDate . ' ' . $endStr, 'Asia/Bangkok');
+                    
+                    if ($nowAuto->greaterThanOrEqualTo($schEndDT)) {
+                        $stc->status = 'empty';
+                        $stc->save();
+                    }
+                } catch (\Exception $e) { continue; }
+            }
+        } catch (\Exception $e) {}
         // ==========================================
 
         $staffs = Staff::all();
@@ -343,7 +351,7 @@ class ScheduleController extends Controller
                     }
                 }
             }
-            return redirect()->back()->with('success', 'เพิ่มตารางปฏิบัติงานเรียบร้อย');
+            return redirect()->back()->with('success', 'เพิ่มตารางปฏิบัติงานเรียบร้อยแล้วครับ');
         });
     }
 
@@ -388,15 +396,11 @@ class ScheduleController extends Controller
         });
     }
 
-    /**
-     * ลบตารางเวรและคนสำรอง โดยป้องกันปัญหารหัสอ้างอิงและรักษาประวัติรีวิวไว้ตลอดกาล
-     */
     public function destroy($schedule_id)
     {
         return DB::transaction(function () use ($schedule_id) {
             $schedule = Schedule::findOrFail($schedule_id);
 
-            // 1. ค้นหาคนสำรองทั้งหมดที่มีช่วงเวลาทับซ้อนกับ Slot หลัก
             $substitutes = Schedule::where('counter_sub_id', $schedule->counter_sub_id)
                 ->where('schedule_date', $schedule->schedule_date)
                 ->where('schedule_id', '!=', $schedule_id)
@@ -405,23 +409,19 @@ class ScheduleController extends Controller
                       ->where('end_time', '>', $schedule->start_time);
                 })->get();
 
-            // รวบรวม ID ของตารางเวรทั้งหมดที่จะถูกลบทิ้ง
             $scheduleIdsToUnlink = $substitutes->pluck('schedule_id')->toArray();
             $scheduleIdsToUnlink[] = $schedule_id;
 
             if (class_exists(Checkin::class)) {
-                // 2. ดึงข้อมูล Check-in ทั้งหมดที่เคยอ้างอิงถึงตารางเวรกลุ่มนี้
                 $oldCheckins = Checkin::whereIn('schedule_id', $scheduleIdsToUnlink)->get();
                 $checkinIdsToDelete = $oldCheckins->pluck('checkin_id')->toArray();
 
                 if (!empty($checkinIdsToDelete)) {
-                    // 3. ก่อนที่จะลบ Check-in ให้ย้ายประวัติการประเมิน (Evaluation) ไปผูกกับพนักงานแทน เพื่อให้รีวิวไม่หายไป!
                     if (class_exists(Evaluation::class)) {
                         $evals = Evaluation::whereIn('checkin_id', $checkinIdsToDelete)->get();
                         foreach ($evals as $ev) {
                             $ck = $oldCheckins->firstWhere('checkin_id', $ev->checkin_id);
                             if ($ck) {
-                                // ก็อปปี้รหัสพนักงานและเคาน์เตอร์ลงไปเก็บในตารางรีวิว
                                 if (Schema::hasColumn('evaluation', 'staff_id') && empty($ev->staff_id)) {
                                     $ev->staff_id = $ck->staff_id;
                                 }
@@ -430,27 +430,22 @@ class ScheduleController extends Controller
                                 }
                             }
                             try {
-                                // ปลดล็อก checkin_id เพื่อไม่ให้โดนลบตาม
                                 $ev->checkin_id = null;
                                 $ev->save();
                             } catch (\Exception $e) {}
                         }
                     }
-
-                    // 4. ลบประวัติ Check-in ทิ้งเลย! แก้ปัญหา 1048 Column 'schedule_id' cannot be null ได้ 100%
                     Checkin::whereIn('schedule_id', $scheduleIdsToUnlink)->delete();
                 }
             }
 
-            // 5. ลบ Slot ของคนสำรองทั้งหมด
             foreach ($substitutes as $sub) {
                 $sub->delete();
             }
 
-            // 6. ลบ Slot หลัก
             $schedule->delete();
 
-            return redirect()->back()->with('success', 'ลบข้อมูลตารางปฏิบัติงานและคนสำรองเรียบร้อยแล้ว');
+            return redirect()->back()->with('success', 'ลบข้อมูลตารางปฏิบัติงานและคนสำรองเรียบร้อยแล้ว (ประวัติการประเมินยังคงอยู่)');
         });
     }
 

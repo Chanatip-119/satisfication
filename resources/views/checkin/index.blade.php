@@ -9,10 +9,10 @@
 </head>
 <body>
 
-    @if(isset($show_warning_bar) && $show_warning_bar)
+    @if(isset($show_warning_bar) &&$show_warning_bar)
     <div class="notification-bar">
         <span class="notification-icon">🔔</span>
-        แจ้งเตือน: {{ $counter->name }} จะหมดเวลาใน 15 นาที ({{ $counter->time_end }}) — Staff: {{ $staff->name }}
+        แจ้งเตือน: {{ $counter->name }} จะหมดเวลาใน 15 นาที ({{ $counter->time_end }}) — Staff: {{$staff->name }}
     </div>
     @endif
 
@@ -36,18 +36,18 @@
             @csrf
             <h2 class="section-title">เลือก Counter ที่จะประจำ</h2>
             <div class="grid-2">
-                @foreach($counters as $c)
+                <?php foreach($counters as$c): ?>
                 <label class="card-selectable" onclick="document.querySelectorAll('.card-selectable').forEach(el=>el.classList.remove('selected')); this.classList.add('selected');">
                     <input type="radio" name="counter_id" value="{{ $c->id }}" required>
                     <div class="counter-name">{{ $c->name }}</div>
-                    <div class="counter-time">{{ $c->time_start }} - {{ $c->time_end }}</div>
-                    @if($c->is_available)
+                    <div class="counter-time">{{ $c->time_start }} - {{$c->time_end }}</div>
+                    <?php if($c->is_available): ?>
                         <div class="status available">ว่าง</div>
-                    @else
+                    <?php else: ?>
                         <div class="status occupied">มีบุคลากรอยู่แล้ว</div>
-                    @endif
+                    <?php endif; ?>
                 </label>
-                @endforeach
+                <?php endforeach; ?>
             </div>
             <button type="submit" class="btn btn-primary">ถัดไป ➔</button>
         </form>
@@ -117,7 +117,7 @@
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">ช่วงเวลา</span>
-                    <span class="detail-value">{{ $counter->time_start }} - {{ $counter->time_end }} น.</span>
+                    <span class="detail-value">{{ $counter->time_start }} - {{$counter->time_end }} น.</span>
                 </div>
             </div>
 
@@ -142,7 +142,7 @@
             </div>
             <div class="detail-row">
                 <span class="detail-label">เคาน์เตอร์</span>
-                <span class="detail-value">{{ $counter->name }} — {{ $counter->location }}</span>
+                <span class="detail-value">{{ $counter->name }} — {{$counter->location }}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Check-in เมื่อ</span>
@@ -231,9 +231,9 @@
 
             <div class="filter-group">
                 <div class="filter-tag active" id="filter-all" onclick="filterReviews('all')">ทั้งหมด ({{ $review_stats->total }})</div>
-                @foreach($review_filters as $filter)
-                <div class="filter-tag">{{ $filter->name }} ({{ $filter->count }})</div>
-                @endforeach
+                <?php foreach($review_filters as$filter): ?>
+                <div class="filter-tag">{{ $filter->name }} ({{$filter->count }})</div>
+                <?php endforeach; ?>
                 <div class="filter-tag danger" id="filter-negative" onclick="filterReviews('negative')">เชิงลบ ({{ $review_stats->negative }})</div>
             </div>
 
@@ -243,17 +243,17 @@
             </div>
 
             <div style="height: 300px; overflow-y: auto; padding-right: 4px;">
-                @foreach($reviews as $review)
-                <div class="review-card review-item {{ $review->rating <= 2 ? 'negative' : '' }}" data-rating="{{ $review->rating }}">
-                    <div class="review-time">{{ $review->date }} - {{ $review->time }} น.</div>
+                <?php foreach($reviews as$review): ?>
+                <div class="review-card review-item <?php echo $review->rating <= 2 ? 'negative' : ''; ?>" data-rating="{{ $review->rating }}">
+                    <div class="review-time">{{ $review->date }} - {{$review->time }} น.</div>
                     <div class="review-text">{{ $review->comment ?? 'ไม่มีข้อเสนอแนะ' }}</div>
                     <div class="review-stars">
-                        @for($i = 1; $i <= 5; $i++)
-                            {{ $i <= $review->rating ? '★' : '☆' }}
-                        @endfor
+                        <?php for($i = 1; $i <= 5; $i++): ?>
+                            <?php echo $i <=$review->rating ? '★' : '☆'; ?>
+                        <?php endfor; ?>
                     </div>
                 </div>
-                @endforeach
+                <?php endforeach; ?>
             </div>
         </div>
         @endif
@@ -329,7 +329,6 @@
 
     <script>
 (function () {
-    // บล็อก /api/my-reviews ของสคริปต์เก่า ไม่ให้พ่นค่า undefined ออกมาทับ
     const originalFetch = window.fetch;
     window.fetch = function (url, options) {
         if (typeof url === 'string' && url.includes('/api/my-reviews')) {
@@ -338,7 +337,7 @@
         return originalFetch.apply(this, arguments);
     };
 
-    let currentFilter = 'all'; // 'all' หรือ 'negative'
+    let currentFilter = 'all';
 
     function extractReviewCards(rootNode) {
         let allDivs = Array.from(rootNode.querySelectorAll('div'));
@@ -402,7 +401,6 @@
             }
         }
 
-        // อัปเดตกล่องตัวเลขสรุป 3 ช่องด้านบน
         allDivs.forEach(el => {
             if (el.children.length === 0) {
                 let label = (el.innerText || '').trim();
@@ -415,7 +413,6 @@
             }
         });
 
-        // อัปเดตปุ่มกดสลับ "ทั้งหมด (X)" และ "เชิงลบ (Y)"
         let allElements = Array.from(document.querySelectorAll('button, span, div, a'));
         allElements.forEach(el => {
             if (el.children.length === 0) {
@@ -464,7 +461,6 @@
             }
         });
 
-        // อัปเดตแถวหัวข้อ "เคาน์เตอร์ X.X ... รีวิว" เพียงบรรทัดเดียว
         let candidates = allDivs.filter(el => {
             let txt = (el.innerText || '').trim();
             return txt.includes('เคาน์เตอร์') &&
@@ -494,7 +490,6 @@
         }
     }
 
-    // ดึงรีวิวใหม่ในพื้นหลังเมื่ออยู่บน URL ที่มี active_checkin_id (ไม่ต้องกด F5 เอง และไม่เพิ่มยอด Check-in)
     function pollLatestReviews() {
         if (!window.location.search.includes('active_checkin_id')) return;
 
@@ -506,8 +501,17 @@
         .then(res => res.ok ? res.text() : null)
         .then(html => {
             if (!html) return;
+            
             let parser = new DOMParser();
             let doc = parser.parseFromString(html, 'text/html');
+
+            // =======================================
+            // ดักจับและเด้งออกเฉพาะเมื่อระบบหลังบ้านเคลียร์คิวจนหน้าต่าง Check-in สำเร็จหายไปแล้ว (เตะออก 100%)
+            // =======================================
+            if (!doc.querySelector('.success-icon')) {
+                window.location.replace("{{ url('/checkin') }}");
+                return;
+            }
 
             let newCards = extractReviewCards(doc);
             let currentCards = extractReviewCards(document);
@@ -533,13 +537,12 @@
         }
     });
 
-    // อัปเดตรีวิวใหม่อัตโนมัติทุกๆ 4 วินาที
     setInterval(pollLatestReviews, 4000);
 
     document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => syncAndFilterMyReviews('all'), 200);
     });
 })();
-</script>
+    </script>
 </body>
 </html>

@@ -38,6 +38,20 @@
             </div>
         @endif
 
+        @if(session('status'))
+            <div class="alert-info">
+                ℹ️ {{ session('status') }}
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert-danger">
+                @foreach ($errors->all() as $error)
+                    <div>⚠️ {{ $error }}</div>
+                @endforeach
+            </div>
+        @endif
+
         <form action="{{ route('login.submit') }}" method="POST">
             @csrf
             <div class="form-group">
@@ -80,7 +94,7 @@
                     </div>
                     <span>จดจำการเข้าสู่ระบบ</span>
                 </label>
-                <a href="#" class="forgot-password">ลืมรหัสผ่าน?</a>
+                <a href="{{ route('password.request') }}" class="forgot-password">ลืมรหัสผ่าน?</a>
             </div>
 
             <button type="submit" class="btn-login">เข้าสู่ระบบ</button>
