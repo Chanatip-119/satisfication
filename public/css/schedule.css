@@ -350,6 +350,7 @@ td:last-child { border-right: none; }
     grid-template-columns: 1fr 1fr;
     gap: 15px;
 }
+
 .radio-card {
     border: 1px solid #cbd5e0;
     border-radius: 8px;
@@ -357,14 +358,55 @@ td:last-child { border-right: none; }
     cursor: pointer;
     display: flex;
     align-items: center;
-    transition: 0.2s;
+    transition: all 0.2s;
+    background-color: #fff;
+    position: relative;
 }
-.radio-card:hover { border-color: #a0aec0; background: #f7fafc; }
+
+.radio-card:hover { 
+    border-color: #cbd5e0; 
+    background-color: #f8fafc; 
+}
+
+/* ตกแต่ง Radio Button ให้เป็นวงกลมสีเหลืองทองซ้อนกัน */
 .radio-card input[type="radio"] {
-    accent-color: #FFCC00;
-    width: 18px;
-    height: 18px;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #cbd5e0;
+    border-radius: 50%;
     margin-right: 12px;
+    outline: none;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease-in-out;
+    background-color: #fff;
+    flex-shrink: 0;
+}
+
+/* ตอนที่ถูกเลือก (Checked) จะเปลี่ยนกรอบเป็นสีเหลือง */
+.radio-card input[type="radio"]:checked {
+    border: 3px solid #ffcc00;
+}
+
+/* จุดวงกลมข้างในตอนถูกเลือก */
+.radio-card input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #ffcc00;
+}
+
+/* เมื่อการ์ดถูกเลือก (Checked) ให้เปลี่ยนกรอบและพื้นหลังเป็นการ์ดสีเหลือง */
+.radio-card:has(input[type="radio"]:checked) {
+    border-color: #ffcc00;
+    background-color: #fefce8;
 }
 
 /* ปุ่มเลือกวันจันทร์-อาทิตย์ (Step 2) */
@@ -709,3 +751,4 @@ td:last-child { border-right: none; }
 .logout-btn:hover {
     opacity: 0.85;
 }
+

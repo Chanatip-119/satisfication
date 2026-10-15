@@ -9,10 +9,10 @@
 </head>
 <body>
 
-    @if(isset($show_warning_bar) &&$show_warning_bar)
+    @if(isset($show_warning_bar) && $show_warning_bar)
     <div class="notification-bar">
         <span class="notification-icon">🔔</span>
-        แจ้งเตือน: {{ $counter->name }} จะหมดเวลาใน 15 นาที ({{ $counter->time_end }}) — Staff: {{$staff->name }}
+        แจ้งเตือน: {{ $counter->name }} จะหมดเวลาใน 15 นาที ({{ $counter->time_end }}) — Staff: {{ $staff->name }}
     </div>
     @endif
 
@@ -36,11 +36,11 @@
             @csrf
             <h2 class="section-title">เลือก Counter ที่จะประจำ</h2>
             <div class="grid-2">
-                <?php foreach($counters as$c): ?>
+                <?php foreach($counters as $c): ?>
                 <label class="card-selectable" onclick="document.querySelectorAll('.card-selectable').forEach(el=>el.classList.remove('selected')); this.classList.add('selected');">
                     <input type="radio" name="counter_id" value="{{ $c->id }}" required>
                     <div class="counter-name">{{ $c->name }}</div>
-                    <div class="counter-time">{{ $c->time_start }} - {{$c->time_end }}</div>
+                    <div class="counter-time">{{ $c->time_start }} - {{ $c->time_end }}</div>
                     <?php if($c->is_available): ?>
                         <div class="status available">ว่าง</div>
                     <?php else: ?>
@@ -117,7 +117,7 @@
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">ช่วงเวลา</span>
-                    <span class="detail-value">{{ $counter->time_start }} - {{$counter->time_end }} น.</span>
+                    <span class="detail-value">{{ $counter->time_start }} - {{ $counter->time_end }} น.</span>
                 </div>
             </div>
 
@@ -142,7 +142,7 @@
             </div>
             <div class="detail-row">
                 <span class="detail-label">เคาน์เตอร์</span>
-                <span class="detail-value">{{ $counter->name }} — {{$counter->location }}</span>
+                <span class="detail-value">{{ $counter->name }} — {{ $counter->location }}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Check-in เมื่อ</span>
@@ -217,39 +217,36 @@
             <div class="stats-grid">
                 <div class="stat-box">
                     <div class="stat-label">คะแนนเฉลี่ย</div>
-                    <div class="stat-value">{{ $review_stats->average }}</div>
+                    <div class="stat-value" id="stat-avg-val">{{ $review_stats->average }}</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">ประเมินทั้งหมด</div>
-                    <div class="stat-value">{{ $review_stats->total }}</div>
+                    <div class="stat-value" id="stat-total-val">{{ $review_stats->total }}</div>
                 </div>
                 <div class="stat-box highlight">
                     <div class="stat-label">เชิงลบ</div>
-                    <div class="stat-value">{{ $review_stats->negative }}</div>
+                    <div class="stat-value" id="stat-neg-val">{{ $review_stats->negative }}</div>
                 </div>
             </div>
 
             <div class="filter-group">
-                <div class="filter-tag active" id="filter-all" onclick="filterReviews('all')">ทั้งหมด ({{ $review_stats->total }})</div>
-                <?php foreach($review_filters as$filter): ?>
-                <div class="filter-tag">{{ $filter->name }} ({{$filter->count }})</div>
-                <?php endforeach; ?>
-                <div class="filter-tag danger" id="filter-negative" onclick="filterReviews('negative')">เชิงลบ ({{ $review_stats->negative }})</div>
+                <div class="filter-tag active" id="btn-filter-all" onclick="filterReviews('all')">ทั้งหมด (<span id="filter-total-count">{{ $review_stats->total }}</span>)</div>
+                <div class="filter-tag danger" id="btn-filter-neg" onclick="filterReviews('negative')">เชิงลบ (<span id="filter-neg-count">{{ $review_stats->negative }}</span>)</div>
             </div>
 
             <div class="review-header-flex">
-                <h3 style="font-size: 14px; font-weight: 600;">{{ $counter->name }} <span style="color:#888; font-weight:400;">{{ $review_stats->current_counter_total }} รีวิว</span></h3>
-                <span style="color:#00C853; font-weight:600; font-size:14px;">{{ $review_stats->current_counter_average }} ★</span>
+                <h3 style="font-size: 14px; font-weight: 600;">{{ $counter->name }} <span style="color:#888; font-weight:400;" id="header-total-count">{{ $review_stats->current_counter_total }} รีวิว</span></h3>
+                <span style="color:#00C853; font-weight:600; font-size:14px;" id="header-avg-val">{{ $review_stats->current_counter_average }} ★</span>
             </div>
 
-            <div style="height: 300px; overflow-y: auto; padding-right: 4px;">
-                <?php foreach($reviews as$review): ?>
+            <div id="review-list-container" style="height: 300px; overflow-y: auto; padding-right: 4px;">
+                <?php foreach($reviews as $review): ?>
                 <div class="review-card review-item <?php echo $review->rating <= 2 ? 'negative' : ''; ?>" data-rating="{{ $review->rating }}">
-                    <div class="review-time">{{ $review->date }} - {{$review->time }} น.</div>
+                    <div class="review-time">{{ $review->date }} - {{ $review->time }} น.</div>
                     <div class="review-text">{{ $review->comment ?? 'ไม่มีข้อเสนอแนะ' }}</div>
                     <div class="review-stars">
                         <?php for($i = 1; $i <= 5; $i++): ?>
-                            <?php echo $i <=$review->rating ? '★' : '☆'; ?>
+                            <?php echo $i <= $review->rating ? '★' : '☆'; ?>
                         <?php endfor; ?>
                     </div>
                 </div>
@@ -298,21 +295,27 @@
 
     @if($step == 4)
     <script>
-        function filterReviews(type) {
-            const items = document.querySelectorAll('.review-item');
-            const btnAll = document.getElementById('filter-all');
-            const btnNeg = document.getElementById('filter-negative');
+        // ฟังก์ชันจัดการแท็บรีวิว (เขียนใหม่ให้เสถียร 100%)
+        let currentFilter = 'all';
 
-            if (type === 'all') {
-                btnAll.classList.add('active');
-                btnNeg.classList.remove('active');
-            } else {
-                btnNeg.classList.add('active');
-                btnAll.classList.remove('active');
+        function filterReviews(type) {
+            currentFilter = type;
+            const items = document.querySelectorAll('.review-item');
+            const btnAll = document.getElementById('btn-filter-all');
+            const btnNeg = document.getElementById('btn-filter-neg');
+
+            if (btnAll && btnNeg) {
+                if (type === 'all') {
+                    btnAll.classList.add('active');
+                    btnNeg.classList.remove('active');
+                } else {
+                    btnNeg.classList.add('active');
+                    btnAll.classList.remove('active');
+                }
             }
 
             items.forEach(item => {
-                const rating = parseInt(item.getAttribute('data-rating'));
+                const rating = parseInt(item.getAttribute('data-rating') || '5');
                 if (type === 'all') {
                     item.style.display = 'block';
                 } else if (type === 'negative') {
@@ -324,225 +327,92 @@
                 }
             });
         }
+
+        (function () {
+            // บล็อกไม่ให้สคริปต์หน้าบ้านพ่น error เวลา fetch
+            const originalFetch = window.fetch;
+            window.fetch = function (url, options) {
+                if (typeof url === 'string' && url.includes('/api/my-reviews')) {
+                    return new Promise(() => {}); 
+                }
+                return originalFetch.apply(this, arguments);
+            };
+
+            // อัปเดตรีวิวและเวลาแบบเรียลไทม์ โดยใช้ ID ระบุตัวตน (ไม่เดาเนื้อหาแล้ว)
+            function pollLatestReviews() {
+                if (!window.location.search.includes('active_checkin_id')) return;
+
+                originalFetch(window.location.href, {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    cache: 'no-store'
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('Network error');
+                    return res.text();
+                })
+                .then(html => {
+                    if (!html) return;
+                    
+                    let parser = new DOMParser();
+                    let doc = parser.parseFromString(html, 'text/html');
+
+                    // ถ้าไม่มีเครื่องหมายถูกสีเขียว = หมดเวลาโดนเตะออกแล้ว ให้เด้งกลับหน้าแรกทันที
+                    if (!doc.querySelector('.success-icon')) {
+                        window.location.replace("{{ url('/checkin') }}");
+                        return;
+                    }
+
+                    // 1. อัปเดตแถบแจ้งเตือน 15 นาที
+                    let newNotifBar = doc.querySelector('.notification-bar');
+                    let currentNotifBar = document.querySelector('.notification-bar');
+
+                    if (newNotifBar && !currentNotifBar) {
+                        document.body.insertBefore(newNotifBar.cloneNode(true), document.body.firstChild);
+                    } else if (!newNotifBar && currentNotifBar) {
+                        currentNotifBar.remove();
+                    } else if (newNotifBar && currentNotifBar) {
+                        currentNotifBar.innerHTML = newNotifBar.innerHTML;
+                    }
+
+                    // 2. เช็คว่ามีรีวิวใหม่เข้ามาไหม (ดูจากกล่องตัวเลข)
+                    let newTotal = doc.getElementById('stat-total-val') ? doc.getElementById('stat-total-val').innerText : '';
+                    let currentTotal = document.getElementById('stat-total-val') ? document.getElementById('stat-total-val').innerText : '';
+                    let newNeg = doc.getElementById('stat-neg-val') ? doc.getElementById('stat-neg-val').innerText : '';
+                    let currentNeg = document.getElementById('stat-neg-val') ? document.getElementById('stat-neg-val').innerText : '';
+
+                    // ถ้ารีวิวมีเพิ่ม/ลด ค่อยอัปเดตกล่องคอมเมนต์
+                    if (newTotal !== currentTotal || newNeg !== currentNeg) {
+                        
+                        // อัปเดตตัวเลขทุกจุดบนหน้าจอ
+                        const idsToUpdate = [
+                            'stat-avg-val', 'stat-total-val', 'stat-neg-val',
+                            'filter-total-count', 'filter-neg-count',
+                            'header-total-count', 'header-avg-val'
+                        ];
+                        
+                        idsToUpdate.forEach(id => {
+                            if (doc.getElementById(id) && document.getElementById(id)) {
+                                document.getElementById(id).innerText = doc.getElementById(id).innerText;
+                            }
+                        });
+
+                        // อัปเดตกล่องคอมเมนต์ด้านล่าง
+                        let newList = doc.getElementById('review-list-container');
+                        let curList = document.getElementById('review-list-container');
+                        if (newList && curList) {
+                            curList.innerHTML = newList.innerHTML;
+                            filterReviews(currentFilter); // ให้ค้างแท็บเดิมที่พนักงานกำลังกดดูอยู่
+                        }
+                    }
+                })
+                .catch(() => {});
+            }
+
+            // ตั้งเวลาเช็คพื้นหลังทุก 4 วินาที
+            setInterval(pollLatestReviews, 4000);
+        })();
     </script>
     @endif
-
-    <script>
-(function () {
-    const originalFetch = window.fetch;
-    window.fetch = function (url, options) {
-        if (typeof url === 'string' && url.includes('/api/my-reviews')) {
-            return new Promise(() => {}); 
-        }
-        return originalFetch.apply(this, arguments);
-    };
-
-    let currentFilter = 'all';
-
-    function extractReviewCards(rootNode) {
-        let allDivs = Array.from(rootNode.querySelectorAll('div'));
-        return allDivs.filter(div => {
-            let txt = div.innerText || div.textContent || '';
-            let hasStars = txt.includes('★') || txt.includes('☆');
-            let hasTimePattern = /\d{1,2}:\d{2}\s*น\./.test(txt);
-            let childHasBoth = Array.from(div.children).some(ch => {
-                let cTxt = ch.innerText || ch.textContent || '';
-                return (cTxt.includes('★') || cTxt.includes('☆')) && /\d{1,2}:\d{2}\s*น\./.test(cTxt);
-            });
-            return hasStars && hasTimePattern && !childHasBoth;
-        });
-    }
-
-    function syncAndFilterMyReviews(filterMode = currentFilter) {
-        currentFilter = filterMode;
-
-        let allDivs = Array.from(document.querySelectorAll('div'));
-        let reviewCards = extractReviewCards(document);
-
-        let totalCount = reviewCards.length;
-        let sumScore = 0;
-        let negativeCount = 0;
-
-        reviewCards.forEach(card => {
-            let txt = card.innerText || '';
-            let filledStars = (txt.match(/★/g) || []).length;
-            let emptyStars  = (txt.match(/☆/g) || []).length;
-
-            if (emptyStars === 0 && filledStars === 5) {
-                let starSpans = Array.from(card.querySelectorAll('span, i')).filter(s => (s.innerText || '').trim() === '★');
-                if (starSpans.length === 5) {
-                    let activeStars = starSpans.filter(s => {
-                        let c = (s.style.color || window.getComputedStyle(s).color || '').toLowerCase();
-                        return !c.includes('203, 213, 224') && !c.includes('cbd5e0') && !c.includes('ccc') && !c.includes('e2e8f0');
-                    }).length;
-                    if (activeStars > 0) filledStars = activeStars;
-                }
-            }
-
-            let score = filledStars > 0 ? filledStars : 5;
-            let borderStyle = (card.getAttribute('style') || '') + ' ' + window.getComputedStyle(card).borderLeftColor;
-            let isNegative = (score <= 2) || borderStyle.includes('229, 62, 62') || borderStyle.includes('239, 68, 68') || borderStyle.includes('#e53e3e') || borderStyle.includes('#ef4444') || borderStyle.includes('rgb(220, 38, 38)');
-
-            sumScore += score;
-            if (isNegative) negativeCount++;
-
-            card.style.display = (currentFilter === 'negative' && !isNegative) ? 'none' : '';
-        });
-
-        let avgScoreStr = totalCount > 0 ? (sumScore / totalCount).toFixed(1) : '0.0';
-
-        let counterCode = '1.1';
-        let bodyLines = (document.body.innerText || '').split('\n');
-        for (let line of bodyLines) {
-            let m = line.match(/เคาน์เตอร์\s*(\d+\.\d+)/);
-            if (m && m[1]) {
-                counterCode = m[1];
-                break;
-            }
-        }
-
-        allDivs.forEach(el => {
-            if (el.children.length === 0) {
-                let label = (el.innerText || '').trim();
-                let valEl = el.nextElementSibling;
-                if (valEl) {
-                    if (label === 'คะแนนเฉลี่ย') valEl.innerText = avgScoreStr;
-                    else if (label === 'ประเมินทั้งหมด') valEl.innerText = totalCount;
-                    else if (label === 'เชิงลบ') valEl.innerText = negativeCount;
-                }
-            }
-        });
-
-        let allElements = Array.from(document.querySelectorAll('button, span, div, a'));
-        allElements.forEach(el => {
-            if (el.children.length === 0) {
-                let t = (el.innerText || '').trim();
-                if (/^ทั้งหมด\s*\(.*\)$/.test(t)) {
-                    el.innerText = `ทั้งหมด (${totalCount})`;
-                    el.style.cursor = 'pointer';
-                    el.style.userSelect = 'none';
-                    if (currentFilter === 'all') {
-                        el.style.background = '#fefcbf';
-                        el.style.borderColor = '#ecc94b';
-                        el.style.color = '#b7791f';
-                        el.style.fontWeight = '700';
-                    } else {
-                        el.style.background = '#fff';
-                        el.style.borderColor = '#e2e8f0';
-                        el.style.color = '#718096';
-                        el.style.fontWeight = '500';
-                    }
-                    el.onclick = function (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        syncAndFilterMyReviews('all');
-                    };
-                } else if (/^เชิงลบ\s*\(.*\)$/.test(t)) {
-                    el.innerText = `เชิงลบ (${negativeCount})`;
-                    el.style.cursor = 'pointer';
-                    el.style.userSelect = 'none';
-                    if (currentFilter === 'negative') {
-                        el.style.background = '#fed7d7';
-                        el.style.borderColor = '#fc8181';
-                        el.style.color = '#c53030';
-                        el.style.fontWeight = '700';
-                    } else {
-                        el.style.background = '#fff';
-                        el.style.borderColor = '#feb2b2';
-                        el.style.color = '#e53e3e';
-                        el.style.fontWeight = '500';
-                    }
-                    el.onclick = function (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        syncAndFilterMyReviews('negative');
-                    };
-                }
-            }
-        });
-
-        let candidates = allDivs.filter(el => {
-            let txt = (el.innerText || '').trim();
-            return txt.includes('เคาน์เตอร์') &&
-                   txt.includes('รีวิว') &&
-                   !txt.includes('ดูรีวิว') &&
-                   !txt.includes('รีวิวของฉัน') &&
-                   !txt.includes('คะแนนเฉลี่ย') &&
-                   !/\d{1,2}:\d{2}\s*น\./.test(txt);
-        });
-
-        let outerHeader = candidates.find(el => !candidates.includes(el.parentElement));
-
-        if (outerHeader) {
-            let shownCount = currentFilter === 'negative' ? negativeCount : totalCount;
-            outerHeader.style.display = 'flex';
-            outerHeader.style.justifyContent = 'space-between';
-            outerHeader.style.alignItems = 'center';
-            outerHeader.style.padding = '8px 0';
-            outerHeader.style.borderBottom = 'none';
-            outerHeader.innerHTML = `
-                <span style="display:inline-flex; align-items:baseline; gap:6px;">
-                    <strong style="color:#1a202c; font-size:13px;">เคาน์เตอร์ ${counterCode}</strong>
-                    <span style="color:#718096; font-size:12px;">${shownCount} รีวิว</span>
-                </span>
-                <span style="color:#10b981; font-weight:700; font-size:13px;">${avgScoreStr} &#9733;</span>
-            `;
-        }
-    }
-
-    function pollLatestReviews() {
-        if (!window.location.search.includes('active_checkin_id')) return;
-
-        originalFetch(window.location.href, {
-            method: 'GET',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            cache: 'no-store'
-        })
-        .then(res => res.ok ? res.text() : null)
-        .then(html => {
-            if (!html) return;
-            
-            let parser = new DOMParser();
-            let doc = parser.parseFromString(html, 'text/html');
-
-            // =======================================
-            // ดักจับและเด้งออกเฉพาะเมื่อระบบหลังบ้านเคลียร์คิวจนหน้าต่าง Check-in สำเร็จหายไปแล้ว (เตะออก 100%)
-            // =======================================
-            if (!doc.querySelector('.success-icon')) {
-                window.location.replace("{{ url('/checkin') }}");
-                return;
-            }
-
-            let newCards = extractReviewCards(doc);
-            let currentCards = extractReviewCards(document);
-
-            if (newCards.length !== currentCards.length && newCards.length > 0) {
-                let newListContainer = newCards[0].parentElement;
-                let currentListContainer = currentCards.length > 0 ? currentCards[0].parentElement : null;
-
-                if (currentListContainer && newListContainer) {
-                    currentListContainer.innerHTML = newListContainer.innerHTML;
-                    syncAndFilterMyReviews(currentFilter);
-                }
-            }
-        })
-        .catch(() => {});
-    }
-
-    document.body.addEventListener('click', function (e) {
-        let btn = e.target.closest('button, a, div');
-        if (btn && (btn.innerText || '').includes('ดูรีวิวของฉันทั้งหมด')) {
-            setTimeout(() => syncAndFilterMyReviews('all'), 50);
-            setTimeout(() => pollLatestReviews(), 200);
-        }
-    });
-
-    setInterval(pollLatestReviews, 4000);
-
-    document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(() => syncAndFilterMyReviews('all'), 200);
-    });
-})();
-    </script>
 </body>
 </html>

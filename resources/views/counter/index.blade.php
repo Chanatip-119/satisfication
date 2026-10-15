@@ -64,7 +64,6 @@
                     <tr>
                         <th>ชื่อเคาน์เตอร์</th>
                         <th>SUB COUNTER</th>
-                        <th>ช่วงเวลา</th>
                         <th>QR CODE</th>
                         <th>สถานะ</th>
                         <th></th>
@@ -85,9 +84,6 @@
                                     <span style="color: #a0aec0; font-size: 13px;">ไม่มี Sub-Counter</span>
                                 @endforelse
                             </div>
-                        </td>
-                        <td>
-                            <span style="font-size: 14px; color: #718096; font-weight: 500;">08:00–16:00</span>
                         </td>
                         <td>
                             <button class="btn-generate">Generate</button>

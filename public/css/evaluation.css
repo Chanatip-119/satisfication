@@ -93,9 +93,12 @@ h1 {
     justify-content: space-between;
     gap: 15px;
     margin-bottom: 40px;
+    flex-wrap: wrap; /* ทำให้รองรับ Responsive */
 }
 
 .rating-item {
+    flex: 1;
+    min-width: 60px; /* ขนาดขั้นต่ำสำหรับมือถือ */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -104,7 +107,6 @@ h1 {
     border: 1px solid #718096;
     border-radius: 12px;
     cursor: pointer;
-    width: 100%;
     transition: all 0.2s ease;
 }
 
@@ -122,6 +124,7 @@ h1 {
     font-size: 14px;
     color: #718096;
     font-weight: 500;
+    text-align: center;
 }
 
 /* Feedback Form */
@@ -141,13 +144,19 @@ h1 {
 .feedback-group textarea {
     width: 100%;
     background-color: #e2e8f0;
-    border: none;
+    border: 1px solid transparent;
     border-radius: 12px;
     padding: 15px;
     font-size: 16px;
     resize: none;
     height: 100px;
     outline: none;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.feedback-group textarea:focus {
+    background-color: #ffffff;
+    border-color: #ffcc00;
 }
 
 /* Submit Button */
@@ -160,6 +169,7 @@ h1 {
     border-radius: 30px;
     font-size: 16px;
     cursor: pointer;
+    width: 100%;
     transition: background-color 0.2s ease;
 }
 
@@ -167,22 +177,16 @@ h1 {
     background-color: #e6b800;
 }
 
-/* Thank You Card - Aligned with index page */
+/* Thank You Card */
 .thank-you-card {
-    /* Keep the exact same padding as the survey card */
     padding: 60px 50px; 
-    
-    /* Set a minimum height to match the height of the index page form */
     min-height: 560px; 
-    
-    /* Center the content perfectly inside this fixed height */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
 }
 
-/* Big Emoji */
 .big-emoji {
     font-size: 80px;
     margin-bottom: 30px;
@@ -190,20 +194,95 @@ h1 {
     filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.1));
 }
 
-/* Thank You Heading */
 .thank-you-card h1 {
-    font-size: 32px; /* Matched the exact size of the index page H1 */
+    font-size: 32px; 
     color: #1a202c; 
     font-weight: 700;
     margin-bottom: 20px;
 }
 
-/* Thank You Subtext */
 .thank-you-text {
     color: #718096; 
-    font-size: 18px; /* Slightly larger to match the index subtitle */
+    font-size: 18px; 
     line-height: 1.6;
     font-weight: 500;
     text-align: center;
 }
 
+/* ==============================================================
+   Responsive Design สำหรับมือถือ ไอแพด และหน้าจอขนาดเล็ก
+   ============================================================== */
+
+@media (max-width: 768px) {
+    /* สำหรับแท็บเล็ตและไอแพดแนวตั้ง */
+    .survey-card {
+        padding: 40px 30px;
+    }
+
+    .rating-group {
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* สำหรับมือถือ */
+    .header-logo {
+        padding: 10px 20px;
+    }
+    
+    .header-logo img {
+        height: 50px;
+    }
+
+    main {
+        padding: 20px 15px;
+    }
+
+    .survey-card {
+        padding: 30px 20px;
+    }
+
+    h1 {
+        font-size: 24px;
+    }
+
+    .subtitle {
+        font-size: 14px;
+        margin-bottom: 25px;
+    }
+
+    .emoji {
+        font-size: 30px;
+        margin-bottom: 5px;
+    }
+
+    .rating-label {
+        font-size: 11px;
+    }
+
+    .rating-group {
+        gap: 5px;
+        margin-bottom: 25px;
+    }
+    
+    .rating-item {
+        padding: 10px 2px;
+        border-radius: 8px;
+    }
+
+    .big-emoji {
+        font-size: 60px;
+    }
+
+    .thank-you-card h1 {
+        font-size: 24px;
+    }
+
+    .thank-you-text {
+        font-size: 14px;
+    }
+    
+    .feedback-group textarea {
+        height: 80px;
+    }
+}

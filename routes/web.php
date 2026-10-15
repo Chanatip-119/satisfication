@@ -65,5 +65,6 @@ Route::post('/schedule/update/{id}', [ScheduleController::class, 'update'])->nam
 Route::delete('/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->name('schedule.destroy');
 Route::match(['get', 'delete'], '/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->name('schedule.destroy');
 Route::post('/schedule/import', [ScheduleController::class, 'importExcel'])->name('schedule.import');
+Route::get('/schedule/download-template', [ScheduleController::class, 'downloadTemplate'])->name('schedule.downloadTemplate');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

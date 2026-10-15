@@ -36,6 +36,18 @@
                 </ul>
             </div>
         @endif
+        @if(session('import_errors'))
+            <div class="alert-banner" style="background-color: #fffbeb; border: 1px solid #fef3c7; color: #b45309; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
+                <div style="font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-exclamation-triangle" style="color: #d97706;"></i> พบข้อผิดพลาดหรือข้ามการนำเข้าบางแถว:
+                </div>
+                <ul style="margin: 0; padding-left: 22px; max-height: 220px; overflow-y: auto; line-height: 1.6;">
+                    @foreach(session('import_errors') as $err)
+                        <li>{{ $err }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         <div class="header-row">
             <div class="page-title">
@@ -43,7 +55,6 @@
                 <p>ดูแลและแก้ไขว่าบุคลากรคนไหนอยู่เคาน์เตอร์ไหน ช่วงเวลาใด</p>
             </div>
             <div class="action-buttons">
-                <button class="btn btn-outline"><i class="far fa-clock"></i> ตั้งเวลาเคาน์เตอร์</button>
                 <button class="btn btn-outline" onclick="openModal('importModal')"><i class="fas fa-file-excel"></i> Import Excel</button>
                 <button class="btn btn-yellow" onclick="openModal('addModal')">+ เพิ่มตาราง</button>
             </div>
@@ -117,6 +128,7 @@
                                                     $timeClass = 'close-text';
                                                 }
                                     ?>
+                                            @if(!empty($sch->staff_id) && $sch->staff_id > 0 && !empty($sch->staff) && !empty($sch->staff->staff_name))
                                                 <div class="schedule-card {{ $cardClass }}"
                                                 onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", {!! $substitutesData[$sch->schedule_id] ?? "[]" !!}, "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}")'>
                                                     <div class="sch-time {{ $timeClass }}">{{ substr($sch->start_time,0,5) }} - {{ substr($sch->end_time,0,5) }}</div>
@@ -127,6 +139,7 @@
                                                         </div>
                                                     <?php endif; ?>
                                                 </div>
+                                            @endif
                                     <?php 
                                             endif;
                                         endforeach; 
@@ -228,7 +241,7 @@
     <!-- Modal: Import Excel -->
     <!-- ============================================== -->
     <div id="importModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 550px;">
             <div class="modal-header">
                 <div>
                     <h2 style="margin-bottom: 5px;">Import ตารางปฏิบัติงาน</h2>
@@ -237,28 +250,45 @@
                 <button type="button" class="close-btn" onclick="closeModal('importModal')">&times;</button>
             </div>
 
-            <div style="background: #ebf8ff; border: 1px solid #bee3f8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <div style="color: #2b6cb0; font-weight: 700; font-size: 13px; margin-bottom: 5px;"><i class="fas fa-info-circle"></i> รูปแบบคอลัมน์ที่รองรับ (ต้องมีบรรทัด Header)</div>
-                <div style="color: #3182ce; font-size: 12px; line-height: 1.6;">
-                    กรุณาเซฟไฟล์จาก Excel เป็นนามสกุล <strong>CSV UTF-8 (Comma delimited) (*.csv)</strong><br>
+            <div style="background: #ebf8ff; border: 1px solid #bee3f8; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <div style="color: #2b6cb0; font-weight: 700; font-size: 13px; margin-bottom: 8px;"><i class="fas fa-info-circle"></i> รูปแบบคอลัมน์ที่รองรับ (แถวแรกต้องเป็น Header)</div>
+                <div style="color: #3182ce; font-size: 12px; line-height: 1.8;">
                     <strong>A:</strong> รหัสเคาน์เตอร์ย่อย (Counter Sub ID)<br>
                     <strong>B:</strong> รหัสบุคลากร (Staff ID)<br>
-                    <strong>C:</strong> วันที่เข้ากะ (YYYY-MM-DD เช่น 2026-09-30)<br>
+                    <strong>C:</strong> วันที่เข้ากะ (YYYY-MM-DD เช่น 2026-09-30 หรือ DD/MM/YYYY)<br>
                     <strong>D:</strong> เวลาเริ่มงาน (HH:MM เช่น 08:30)<br>
                     <strong>E:</strong> เวลาเลิกงาน (HH:MM เช่น 12:00)
                 </div>
             </div>
 
-            <form action="{{ route('schedule.import') }}" method="POST" enctype="multipart/form-data">
+            <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 160px; background: #f0fff4; border: 1px solid #c6f6d5; padding: 8px 12px; border-radius: 8px;">
+                    <div style="font-size: 11px; color: #276749; font-weight: 600;"><i class="fas fa-file-csv" style="margin-right: 4px;"></i> รองรับไฟล์</div>
+                    <div style="font-size: 11px; color: #38a169; margin-top: 2px;">.csv, .xlsx, .xls (สูงสุด 5MB)</div>
+                </div>
+                <a href="{{ asset('sample_schedule_import.xlsx') }}" download class="btn btn-outline" style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; text-decoration: none; font-size: 12px; white-space: nowrap; border-color: #bbf7d0; color: #166534; background: #f0fdf4;">
+                    <i class="fas fa-file-excel" style="color: #16a34a;"></i> ไฟล์ตัวอย่าง (.xlsx)
+                </a>
+                <a href="{{ route('schedule.downloadTemplate') }}" class="btn btn-outline" style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; text-decoration: none; font-size: 12px; white-space: nowrap;">
+                    <i class="fas fa-download"></i> Template เปล่า (.csv)
+                </a>
+            </div>
+
+            <form action="{{ route('schedule.import') }}" method="POST" enctype="multipart/form-data" id="importScheduleForm">
                 @csrf
                 <div class="form-group">
-                    <label class="form-label">เลือกไฟล์ (.csv)</label>
-                    <input type="file" name="import_file" class="form-control" accept=".csv" required style="padding: 10px;">
+                    <label class="form-label">เลือกไฟล์</label>
+                    <div id="importDropZone" style="border: 2px dashed #cbd5e0; border-radius: 10px; padding: 30px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: #f7fafc;" onclick="document.getElementById('importFileInput').click()">
+                        <div id="importDropIcon" style="font-size: 32px; color: #a0aec0; margin-bottom: 8px;"><i class="fas fa-cloud-upload-alt"></i></div>
+                        <div id="importDropText" style="font-size: 13px; color: #718096; font-weight: 500;">คลิกเลือก หรือ ลากไฟล์มาวางที่นี่</div>
+                        <div id="importDropHint" style="font-size: 11px; color: #a0aec0; margin-top: 4px;">รองรับ .csv, .xlsx, .xls</div>
+                    </div>
+                    <input type="file" name="import_file" id="importFileInput" accept=".xlsx, .xls, .csv, .xlsm, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv, application/octet-stream" required style="display: none;" onchange="handleImportFileSelect(this)">
                 </div>
                 
-                <div class="modal-footer" style="margin-top: 30px;">
+                <div class="modal-footer" style="margin-top: 25px;">
                     <button type="button" class="btn btn-outline" onclick="closeModal('importModal')">ยกเลิก</button>
-                    <button type="submit" class="btn btn-yellow">ยืนยันการ Import</button>
+                    <button type="submit" class="btn btn-yellow" id="btnImportSubmit" disabled><i class="fas fa-file-import" style="margin-right: 6px;"></i> ยืนยันการ Import</button>
                 </div>
             </form>
         </div>
@@ -914,7 +944,7 @@
             } else {
                 // กรณีในฐานข้อมูลเป็น 'waiting' หรือ 'empty' (ยังไม่ได้ Check-in)
                 if (now > slotEnd) {
-                    statusEl.innerText = 'สิ้นสุดเวลา';
+                    statusEl.innerText = 'สิ้นสุดเวลา (ไม่ได้ Check-in)';
                     statusEl.style.color = '#718096';
                     cardBox.style.background = '#f7fafc';
                     cardBox.style.borderColor = '#e2e8f0';
@@ -1035,6 +1065,100 @@
             switchEditTab(1); 
             openModal('complexEditModal');
         }
+
+        // ==========================================
+        // Import Schedule Excel / CSV File Handling
+        // ==========================================
+        function handleImportFileSelect(input) {
+            const dropZone = document.getElementById('importDropZone');
+            const dropIcon = document.getElementById('importDropIcon');
+            const dropText = document.getElementById('importDropText');
+            const dropHint = document.getElementById('importDropHint');
+            const submitBtn = document.getElementById('btnImportSubmit');
+
+            if (!input || !input.files || input.files.length === 0) {
+                if (submitBtn) submitBtn.disabled = true;
+                return;
+            }
+
+            const file = input.files[0];
+            const fileName = file.name;
+            const ext = fileName.split('.').pop().toLowerCase().trim();
+            const allowed = ['csv', 'xlsx', 'xls', 'xlsm', 'txt'];
+
+            if (!allowed.includes(ext)) {
+                alert('รองรับเฉพาะไฟล์ .xlsx, .xls, .csv เท่านั้น (คุณเลือกไฟล์: ' + fileName + ')');
+                input.value = '';
+                if (submitBtn) submitBtn.disabled = true;
+                return;
+            }
+
+            let sizeStr = '';
+            if (file.size > 1024 * 1024) {
+                sizeStr = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            } else {
+                sizeStr = (file.size / 1024).toFixed(1) + ' KB';
+            }
+
+            if (dropZone) {
+                dropZone.style.borderColor = '#38a169';
+                dropZone.style.background = '#f0fff4';
+            }
+
+            if (dropIcon) {
+                if (ext === 'csv') {
+                    dropIcon.innerHTML = '<i class="fas fa-file-csv" style="color: #2b6cb0;"></i>';
+                } else {
+                    dropIcon.innerHTML = '<i class="fas fa-file-excel" style="color: #107c41;"></i>';
+                }
+            }
+
+            if (dropText) {
+                dropText.innerHTML = '<span style="color: #1a202c; font-weight: 700;">' + fileName + '</span> (' + sizeStr + ')';
+            }
+
+            if (dropHint) {
+                dropHint.innerHTML = '<span style="color: #38a169;"><i class="fas fa-check-circle"></i> พร้อมนำเข้าข้อมูล (คลิกหากต้องการเปลี่ยนไฟล์)</span>';
+            }
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const dropZone = document.getElementById('importDropZone');
+            const fileInput = document.getElementById('importFileInput');
+
+            if (dropZone && fileInput) {
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropZone.style.borderColor = '#3182ce';
+                        dropZone.style.background = '#ebf8ff';
+                    }, false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (fileInput.files.length === 0) {
+                            dropZone.style.borderColor = '#cbd5e0';
+                            dropZone.style.background = '#f7fafc';
+                        }
+                    }, false);
+                });
+
+                dropZone.addEventListener('drop', function (e) {
+                    if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+                        fileInput.files = e.dataTransfer.files;
+                        handleImportFileSelect(fileInput);
+                    }
+                }, false);
+            }
+        });
     </script>
 </body>
 </html>
