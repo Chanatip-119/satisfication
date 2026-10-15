@@ -28,7 +28,7 @@
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
 
-        <a href="{{ url('/') }}" class="logout-btn"></i>↩ Logout</a>
+        <a href="{{ route('logout') }}" class="logout-btn">↩ Logout</a>
     </aside>
 
     <main class="content">
@@ -66,6 +66,7 @@
                 <thead>
                     <tr>
                         <th>เคาน์เตอร์ย่อย</th>
+                        <th>ช่วงเวลา</th>
                         <th>คะแนนเฉลี่ย</th>
                         <th>จำนวนการประเมิน</th>
                         <th>STAFF ปัจจุบัน</th>
@@ -76,6 +77,7 @@
                     @foreach($countersList as $c)
                     <tr>
                         <td>{{ $c->name }}</td>
+                        <td>{{ $c->time }}</td>
                         <td>
                             <span class="rating-badge {{ $c->avg_rating >= 4 ? 'rating-good' : 'rating-bad' }}">
                                 {{ $c->avg_rating }}

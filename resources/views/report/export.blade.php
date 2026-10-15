@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ส่งออกรายงาน</title>
-    <link rel="stylesheet" href="{{ asset('css/export.css') }}?v={{ time() }}">
+    <link rel="stylesheet" href="{{ asset('css/export.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -28,8 +28,8 @@
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item active">ส่งออกรายงาน</a>
 
-        <a href="{{ url('/logout') }}" class="logout-btn" style="margin-top: auto !important; color: #fff !important; text-decoration: none !important; padding: 14px 16px 6px 16px !important; font-size: 14px !important; font-weight: 500 !important; display: flex !important; align-items: center !important; gap: 8px !important; border-top: 1px solid rgba(255, 255, 255, 0.35) !important; position: sticky !important; bottom: 15px !important; box-sizing: border-box !important; background: transparent !important; width: 100% !important;">
-        </i>↩ Logout</a>
+        <a href="{{ route('logout') }}" class="logout-btn" style="margin-top: auto !important; color: #fff !important; text-decoration: none !important; padding: 14px 16px 6px 16px !important; font-size: 14px !important; font-weight: 500 !important; display: flex !important; align-items: center !important; gap: 8px !important; border-top: 1px solid rgba(255, 255, 255, 0.35) !important; position: sticky !important; bottom: 15px !important; box-sizing: border-box !important; background: transparent !important; width: 100% !important;">
+        ↩ Logout</a>
     </div>
 
     <div class="content">

@@ -28,7 +28,7 @@
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
 
-        <a href="{{ url('/') }}" class="logout-btn"></i>↩ Logout</a>
+        <a href="{{ route('logout') }}" class="logout-btn">↩ Logout</a>
     </aside>
 
     <main class="content">

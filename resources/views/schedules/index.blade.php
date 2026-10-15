@@ -22,7 +22,7 @@
         <a href="{{ url('/qrcode') }}" class="menu-item {{ request()->is('/qrcode') ? 'active' : '' }}">QR Code</a>
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
-        <a href="{{ url('/') }}" class="logout-btn"></i>↩ Logout</a>
+        <a href="{{ route('logout') }}" class="logout-btn">↩ Logout</a>
     </div>
 
     <div class="content">
@@ -55,6 +55,7 @@
                 <p>ดูแลและแก้ไขว่าบุคลากรคนไหนอยู่เคาน์เตอร์ไหน ช่วงเวลาใด</p>
             </div>
             <div class="action-buttons">
+                <button class="btn btn-outline"><i class="far fa-clock"></i> ตั้งเวลาเคาน์เตอร์</button>
                 <button class="btn btn-outline" onclick="openModal('importModal')"><i class="fas fa-file-excel"></i> Import Excel</button>
                 <button class="btn btn-yellow" onclick="openModal('addModal')">+ เพิ่มตาราง</button>
             </div>
@@ -128,7 +129,6 @@
                                                     $timeClass = 'close-text';
                                                 }
                                     ?>
-                                            @if(!empty($sch->staff_id) && $sch->staff_id > 0 && !empty($sch->staff) && !empty($sch->staff->staff_name))
                                                 <div class="schedule-card {{ $cardClass }}"
                                                 onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", {!! $substitutesData[$sch->schedule_id] ?? "[]" !!}, "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}")'>
                                                     <div class="sch-time {{ $timeClass }}">{{ substr($sch->start_time,0,5) }} - {{ substr($sch->end_time,0,5) }}</div>
@@ -139,7 +139,6 @@
                                                         </div>
                                                     <?php endif; ?>
                                                 </div>
-                                            @endif
                                     <?php 
                                             endif;
                                         endforeach; 

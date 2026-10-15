@@ -125,7 +125,7 @@
         <a href="{{ url('/qrcode') }}" class="menu-item active">QR Code</a>
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
-        <a href="{{ url('/') }}" class="logout-btn"></i>↩ Logout</a>
+        <a href="{{ route('logout') }}" class="logout-btn">↩ Logout</a>
     </div>
 
     <div class="content">
