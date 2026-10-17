@@ -59,7 +59,7 @@ class EvaluationController extends Controller
     {
         $request->validate([
             'rating' => 'required|integer|min:1|max:5',
-            'comment' => 'nullable|string|max:255',
+            'comment' => 'nullable|string|max:2500',
             'checkin_id' => 'required|exists:checkin,checkin_id', // เช็คให้ชัวร์ว่า ID มีอยู่จริง
             'counter_sub_id' => 'required' // รับค่าไว้สำหรับ Redirect กลับไปหน้าเดิม
         ]);

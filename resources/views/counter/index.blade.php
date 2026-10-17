@@ -64,7 +64,6 @@
                     <tr>
                         <th>ชื่อเคาน์เตอร์</th>
                         <th>SUB COUNTER</th>
-                        <th>ช่วงเวลา</th>
                         <th>QR CODE</th>
                         <th>สถานะ</th>
                         <th></th>
@@ -85,9 +84,6 @@
                                     <span style="color: #a0aec0; font-size: 13px;">ไม่มี Sub-Counter</span>
                                 @endforelse
                             </div>
-                        </td>
-                        <td>
-                            <span style="font-size: 14px; color: #718096; font-weight: 500;">08:00–16:00</span>
                         </td>
                         <td>
                             <button class="btn-generate">Generate</button>
@@ -253,21 +249,24 @@
                             endTime = sub.schedules[0].end_time.substring(0, 5);
                         }
 
+                        // ดึงชื่อเคาน์เตอร์หลักมาแสดง
+                        const mainCounterName = data.counter_location || 'ไม่ระบุชื่อเคาน์เตอร์';
+
                         container.innerHTML += `
-                            <div class="sub-counter-item">
+                            <div class="sub-counter-item" style="display: flex; align-items: center; gap: 15px; padding: 10px 0; border-bottom: 1px dashed #e2e8f0;">
                                 <div class="sub-id" style="font-size:16px; font-weight:700; color:#FFCC00; width:40px; text-align:center;">
                                     ${data.counter_id}.${subIndex}
                                 </div>
-                                <div class="time-inputs" style="display:flex; gap:10px; flex:1;">
+                                
+                                <!-- แสดงชื่อเคาน์เตอร์หลักแทนเวลา -->
+                                <div class="counter-name-display" style="flex:1; font-size: 14px; color: #4a5568;">
+                                    ${mainCounterName}
+                                </div>
+
+                                <div class="time-inputs" style="display:none;">
                                     <input type="hidden" name="existing_sub_id[]" value="${sub.counter_sub_id}">
-                                    <div class="form-group" style="margin-bottom:0; flex:1;">
-                                        <label style="font-size: 11px; color: #a0aec0;">เวลาเริ่ม</label>
-                                        <input type="time" name="existing_start_time[]" class="form-control" value="${startTime}" style="padding: 8px;">
-                                    </div>
-                                    <div class="form-group" style="margin-bottom:0; flex:1;">
-                                        <label style="font-size: 11px; color: #a0aec0;">เวลาสิ้นสุด</label>
-                                        <input type="time" name="existing_end_time[]" class="form-control" value="${endTime}" style="padding: 8px;">
-                                    </div>
+                                    <input type="time" name="existing_start_time[]" value="${startTime}">
+                                    <input type="time" name="existing_end_time[]" value="${endTime}">
                                 </div>
                                 <input type="hidden" name="existing_is_active[]" class="sub-is-active-input" value="${sub.is_active ? 1 : 0}">
                                 <div class="sub-pill ${pillClass}" style="white-space:nowrap; ${pillBg}">
@@ -296,7 +295,6 @@
                 document.querySelector('input[name="is_active"][value="1"]').click();
                 document.getElementById('delete-section').style.display = 'none';
                 
-                // เปิดให้แท็บ Sub-Counters ทำงานได้ตั้งแต่โหมดเพิ่มข้อมูล
                 document.getElementById('tab-subcounter-nav').style.display = 'block';
                 document.getElementById('sub-counter-list-container').innerHTML = ''; 
                 
@@ -368,9 +366,16 @@
 
         function addSubCounterField() {
             const container = document.getElementById('sub-counter-list-container');
-            // ใช้เครื่องหมาย - ถ้าช่อง ID ว่างอยู่
+    
+            // ดึงหมายเลขเคาน์เตอร์หลัก (เช่น 1, 2, 7)
             const currentCounterId = document.getElementById('inp_counter_id').value || '-'; 
             currentMaxSubId++;
+
+            // ดึงชื่อเคาน์เตอร์หลักจากช่อง input ในแท็บ "ข้อมูลทั่วไป"
+            // โค้ดจะพยายามหาจากชื่อตัวแปรที่ใช้บ่อย เช่น location, name, หรือ description
+            const nameInput = document.querySelector('input[name="counter_location"]');
+                      
+            const mainCounterName = nameInput ? nameInput.value : 'ไม่ระบุชื่อเคาน์เตอร์';
 
             const isActiveVal = document.querySelector('input[name="is_active"]:checked').value;
             const isActive = (isActiveVal === '1');
@@ -379,31 +384,35 @@
             const dotColor = isActive ? '#38a169' : '#e53e3e';
             const pillText = isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน';
 
-            container.insertAdjacentHTML('beforeend', `
-                <div class="sub-counter-item">
-                    <div class="sub-id" style="font-size:16px; font-weight:700; color:#FFCC00; width:40px; text-align:center;">
-                        ${currentCounterId}.${currentMaxSubId}
-                    </div>
-                    <div class="time-inputs" style="display:flex; gap:10px; flex:1;">
-                        <div class="form-group" style="margin-bottom:0; flex:1;">
-                            <label style="font-size: 11px; color: #a0aec0;">เวลาเริ่ม</label>
-                            <input type="time" name="new_start_time[]" class="form-control" value="08:00" style="padding: 8px;" required>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0; flex:1;">
-                            <label style="font-size: 11px; color: #a0aec0;">เวลาสิ้นสุด</label>
-                            <input type="time" name="new_end_time[]" class="form-control" value="16:00" style="padding: 8px;" required>
-                        </div>
-                    </div>
-                    <input type="hidden" name="new_is_active[]" class="sub-is-active-input" value="${isActiveVal}">
-                    <div class="sub-pill ${pillClass}" style="white-space:nowrap; ${pillBg}">
-                        <span style="color:${dotColor}">●</span> ${pillText}
-                    </div>
-                    <button type="button" class="icon-btn" onclick="this.closest('.sub-counter-item').remove()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
+        container.insertAdjacentHTML('beforeend', `
+            <div class="sub-counter-item" style="display: flex; align-items: center; gap: 15px; padding: 10px 0; border-bottom: 1px dashed #e2e8f0;">
+            <div class="sub-id" style="font-size:16px; font-weight:700; color:#FFCC00; width:40px; text-align:center;">
+                ${currentCounterId}.${currentMaxSubId}
+            </div>
+            
+            <!-- แสดงชื่อเคาน์เตอร์หลัก (เช่น บริการชั้น 5) -->
+            <div class="counter-name-display" style="flex:1; font-size: 14px; color: #4a5568;">
+                ${mainCounterName}
+            </div>
+            
+            <!-- ซ่อนกล่องเวลาไว้ (ยังส่งค่ากลับไปบันทึกได้ปกติ) -->
+            <div class="time-inputs" style="display:none;">
+                <input type="time" name="new_start_time[]" value="08:00" required>
+                <input type="time" name="new_end_time[]" value="16:00" required>
+            </div>
+            
+            <div style="display:flex; justify-content: flex-end; align-items: center; gap: 10px;">
+                <input type="hidden" name="new_is_active[]" class="sub-is-active-input" value="${isActiveVal}">
+                <div class="sub-pill ${pillClass}" style="white-space:nowrap; ${pillBg}">
+                    <span style="color:${dotColor}">●</span> ${pillText}
                 </div>
-            `);
-        }
+                <button type="button" class="icon-btn" onclick="this.closest('.sub-counter-item').remove()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        </div>
+    `);
+}
 
         function deleteSubCounter(counterId, subId) {
             if(confirm('ยืนยันการลบเคาน์เตอร์ย่อยนี้?')) {

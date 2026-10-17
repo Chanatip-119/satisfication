@@ -129,6 +129,7 @@
                                                     $timeClass = 'close-text';
                                                 }
                                     ?>
+                                                @if(!empty($sch->staff_id) && $sch->staff_id > 0 && !empty($sch->staff) && !empty($sch->staff->staff_name))
                                                 <div class="schedule-card {{ $cardClass }}"
                                                 onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", {!! $substitutesData[$sch->schedule_id] ?? "[]" !!}, "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}")'>
                                                     <div class="sch-time {{ $timeClass }}">{{ substr($sch->start_time,0,5) }} - {{ substr($sch->end_time,0,5) }}</div>
@@ -139,6 +140,7 @@
                                                         </div>
                                                     <?php endif; ?>
                                                 </div>
+                                                @endif
                                     <?php 
                                             endif;
                                         endforeach; 

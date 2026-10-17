@@ -61,7 +61,7 @@
             
             <div style="text-align: center; margin-bottom: 24px;">
                 <h2 class="section-title" style="margin-bottom: 4px;">กรอก Unique ID 4 หลัก</h2>
-                <p class="subtitle" style="font-size: 12px;">PIN Code ของคุณที่ได้รับจาก Admin</p>
+                <p class="subtitle" style="font-size: 13px;">PIN Code ของคุณที่ได้รับจาก Admin</p>
             </div>
 
             <div class="pin-display" id="pinDisplay">
@@ -81,7 +81,7 @@
                 <button type="button" class="num-btn" onclick="addPin('7')">7</button>
                 <button type="button" class="num-btn" onclick="addPin('8')">8</button>
                 <button type="button" class="num-btn" onclick="addPin('9')">9</button>
-                <a href="{{ route('checkin.index') }}" class="num-btn btn-back" style="display:flex; justify-content:center; align-items:center; text-decoration:none; font-size:16px;">← กลับ</a>
+                <a href="{{ route('checkin.index') }}" class="num-btn btn-back" style="text-decoration:none; font-size:16px; display:flex; justify-content:center; align-items:center;">← กลับ</a>
                 <button type="button" class="num-btn" onclick="addPin('0')">0</button>
                 <button type="button" class="num-btn" onclick="delPin()">⌫</button>
             </div>
@@ -109,7 +109,6 @@
                 <div class="info-name">{{ $staff->name }}</div>
                 <div class="info-sub">รหัสพนักงาน: {{ $staff->code }}</div>
             </div>
-
             <div style="margin-bottom: 32px;">
                 <div class="detail-row">
                     <span class="detail-label">เคาน์เตอร์</span>
@@ -135,7 +134,7 @@
             <p class="subtitle" style="margin-bottom: 24px;">คุณพร้อมให้บริการแล้ว ขอบคุณที่เข้าร่วมงาน</p>
         </div>
 
-        <div style="margin-bottom: 32px; background: #FFF; border: 1px solid #F0F0F0; border-radius: 12px; padding: 16px;">
+        <div style="margin-bottom: 32px; background: #FFF; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
             <div class="detail-row">
                 <span class="detail-label">ชื่อ</span>
                 <span class="detail-value">{{ $staff->name }}</span>
@@ -154,65 +153,53 @@
             </div>
         </div>
 
-        <button type="button" class="btn btn-primary" style="margin-bottom: 12px;" onclick="document.getElementById('reviewsModal').classList.add('active')">💬 ดูรีวิวของฉันทั้งหมด</button>
+        <button type="button" class="btn btn-primary" style="margin-bottom: 12px;" onclick="document.getElementById('reviewsModal').classList.add('active')">ดูรีวิวของฉันทั้งหมด</button>
         <button type="button" class="btn btn-danger" onclick="document.getElementById('checkoutModal').classList.add('active')">➔ Check-out</button>
         @endif
 
+        <!-- ======================= MODAL SECTION ======================= -->
+        
         @if($step == 4)
+        <!-- Checkout Modal -->
         <div class="modal" id="checkoutModal">
             <button class="modal-close" onclick="document.getElementById('checkoutModal').classList.remove('active')">✕</button>
             
-            <div class="header" style="margin-top: 24px;">
+            <div class="header" style="margin-top: 10px;">
                 <div><img src="{{ asset('images/Buu-logo11.png') }}" alt="BUU Logo" style="width: 80px; height: auto; margin: 0 auto 16px; display: block; background-color: transparent;"></div>
                 <h1 class="title">Staff Check-in</h1>
                 <p class="subtitle">{{ $library_name }}</p>
             </div>
 
-            <div class="stepper">
-                <div class="step completed"></div>
-                <div class="step completed"></div>
-                <div class="step completed"></div>
-                <div class="step completed"></div>
-            </div>
-
             <div style="text-align: center; margin-bottom: 24px;">
-                <div class="success-icon" style="background-color: #F5F6F8; color: #555;">🕒</div>
+                <div class="success-icon" style="background-color: #F5F6F8; color: #4a5568;">🕒</div>
                 <h2 class="title" style="margin-bottom: 8px;">Check-out หรือยัง?</h2>
-                <p class="subtitle" style="font-size: 12px;">คุณต้องการ Check-out จาก{{ $counter->name }} ใช่หรือไม่?<br>หากไม่ยืนยัน ระบบจะ Auto Check-out เมื่อหมดเวลา</p>
+                <p class="subtitle" style="font-size: 13px; line-height: 1.5;">คุณต้องการ Check-out จาก {{ $counter->name }} ใช่หรือไม่?<br>หากไม่ยืนยัน ระบบจะ Auto Check-out เมื่อหมดเวลา</p>
             </div>
 
             <div class="alert-box">
-                <div class="alert-title">⚠️ Auto Check-out: ระบบจะทำการ Check-out อัตโนมัติเมื่อถึงเวลา {{ $counter->time_end }} น. หากคุณไม่กด Check-out ด้วยตัวเอง</div>
+                <div class="alert-title">⚠️ Auto Check-out</div>
+                <div class="alert-text">ระบบจะทำการ Check-out อัตโนมัติเมื่อถึงเวลา {{ $counter->time_end }} น. หากคุณไม่กด Check-out ด้วยตัวเอง</div>
             </div>
 
             <form action="{{ route('checkin.checkout') }}" method="POST">
                 @csrf
                 <input type="hidden" name="checkin_id" value="{{ $current_checkin_id }}">
-                <div class="grid-2">
+                <div class="grid-2" style="margin-bottom: 0;">
                     <button type="button" class="btn btn-outline" onclick="document.getElementById('checkoutModal').classList.remove('active')">✕ ยังไม่ออก (Auto)</button>
                     <button type="submit" class="btn btn-primary">✓ ยืนยัน Check-out</button>
                 </div>
             </form>
         </div>
 
+        <!-- Reviews Modal -->
         <div class="modal" id="reviewsModal">
             <button class="modal-close" onclick="document.getElementById('reviewsModal').classList.remove('active')">✕</button>
             
-            <div class="header" style="margin-top: 24px; margin-bottom: 16px;">
-                <div><img src="{{ asset('images/Buu-logo11.png') }}" alt="BUU Logo" style="width: 48px; height: auto; margin: 0 auto 8px; display: block; background-color: transparent;"></div>
-                <h1 class="title" style="font-size: 16px;">Staff Check-in</h1>
-                <p class="subtitle" style="font-size: 12px;">{{ $library_name }}</p>
+            <div class="header" style="margin-top: 10px; margin-bottom: 16px;">
+                <div><img src="{{ asset('images/Buu-logo11.png') }}" alt="BUU Logo" style="width: 50px; height: auto; margin: 0 auto 8px; display: block; background-color: transparent;"></div>
+                <h1 class="title" style="font-size: 18px;">รีวิวของฉัน</h1>
+                <p class="subtitle">{{ $staff->name }}</p>
             </div>
-
-            <div class="stepper" style="margin-bottom: 24px;">
-                <div class="step completed" style="width: 24px; height: 24px;"></div>
-                <div class="step completed" style="width: 24px; height: 24px;"></div>
-                <div class="step completed" style="width: 24px; height: 24px;"></div>
-                <div class="step active" style="width: 24px; height: 24px;"></div>
-            </div>
-
-            <h2 class="title" style="font-size: 18px;">รีวิวของฉัน</h2>
-            <p class="subtitle" style="margin-bottom: 24px;">{{ $staff->name }}</p>
 
             <div class="stats-grid">
                 <div class="stat-box">
@@ -235,8 +222,8 @@
             </div>
 
             <div class="review-header-flex">
-                <h3 style="font-size: 14px; font-weight: 600;">{{ $counter->name }} <span style="color:#888; font-weight:400;" id="header-total-count">{{ $review_stats->current_counter_total }} รีวิว</span></h3>
-                <span style="color:#00C853; font-weight:600; font-size:14px;" id="header-avg-val">{{ $review_stats->current_counter_average }} ★</span>
+                <h3 style="font-size: 14px; font-weight: 700; color: #2d3748;">{{ $counter->name }} <span style="color:#a0aec0; font-weight:500; font-size: 13px;" id="header-total-count">({{ $review_stats->current_counter_total }} รีวิว)</span></h3>
+                <span style="color:#03543f; font-weight:700; font-size:14px;" id="header-avg-val">{{ $review_stats->current_counter_average }} ★</span>
             </div>
 
             <div id="review-list-container" style="height: 300px; overflow-y: auto; padding-right: 4px;">
@@ -257,6 +244,8 @@
 
     </div>
 
+    <!-- ======================= SCRIPTS ======================= -->
+    
     @if($step == 2)
     <script>
         let currentPin = "";
@@ -295,7 +284,7 @@
 
     @if($step == 4)
     <script>
-        // ฟังก์ชันจัดการแท็บรีวิว (เขียนใหม่ให้เสถียร 100%)
+        // ฟังก์ชันจัดการแท็บรีวิว
         let currentFilter = 'all';
 
         function filterReviews(type) {
@@ -338,7 +327,7 @@
                 return originalFetch.apply(this, arguments);
             };
 
-            // อัปเดตรีวิวและเวลาแบบเรียลไทม์ โดยใช้ ID ระบุตัวตน (ไม่เดาเนื้อหาแล้ว)
+            // อัปเดตรีวิวและเวลาแบบเรียลไทม์
             function pollLatestReviews() {
                 if (!window.location.search.includes('active_checkin_id')) return;
 
