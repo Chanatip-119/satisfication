@@ -1,0 +1,214 @@
+/* =========================================
+   Global & QR Code Section
+========================================= */
+body { 
+    background-color: #eef2f6; 
+    font-family: 'Sarabun', sans-serif; 
+}
+
+.qr-header { margin-bottom: 30px; }
+.qr-header h1 { font-size: 24px; font-weight: 700; color: #1a202c; margin-bottom: 5px; }
+.qr-header p { color: #a0aec0; font-size: 14px; margin: 0; }
+
+.qr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
+}
+
+.qr-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.qr-image-container {
+    width: 220px;
+    height: 220px;
+    background: #f8fafc;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.qr-image-container img {
+    width: 180px;
+    height: 180px;
+    border-radius: 8px;
+}
+
+.qr-title { font-weight: 700; font-size: 16px; color: #1a202c; margin-bottom: 5px; }
+.qr-subtitle { font-size: 13px; color: #a0aec0; margin-bottom: 20px; }
+
+.btn-download {
+    width: 100%;
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-download:hover { background: #1d4ed8; }
+
+.qr-card.disabled .qr-image-container {
+    background: #f1f5f9;
+}
+
+.qr-card.disabled .qr-title, .qr-card.disabled .qr-subtitle {
+    color: #a0aec0;
+}
+
+.btn-disabled {
+    width: 100%;
+    background: #f8fafc;
+    color: #94a3b8;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: not-allowed;
+}
+
+.qr-placeholder {
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cbd5e0;
+    font-size: 40px;
+    background: #e2e8f0;
+    border-radius: 8px;
+    opacity: 0.5;
+}
+
+/* =========================================
+   User Profile Sidebar Section
+========================================= */
+/* เว้นที่ว่างด้านล่างของเมนู ไม่ให้แถบโปรไฟล์ไปบังเมนูอื่น */
+.sidebar {
+    padding-bottom: 80px !important; 
+}
+
+/* กล่องโปรไฟล์เกาะอยู่ด้านล่างสุดของหน้าจอ */
+.user-profile-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    z-index: 10;
+}
+
+.user-profile-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 20px;
+    color: #333;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.user-profile-toggle:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.avatar {
+    width: 38px;
+    height: 38px;
+    background-color: #fff;
+    color: #e5a900;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+.user-info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.user-role {
+    font-size: 12px;
+    color: #555;
+}
+
+.profile-dropdown-menu {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    background-color: #fff;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+    z-index: 100;
+}
+
+.profile-dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    color: #333;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-item.text-danger {
+    color: #e53e3e;
+}
+
+.chevron-icon {
+    transition: transform 0.3s;
+}
+
+.user-profile-container.open .chevron-icon {
+    transform: rotate(180deg);
+}

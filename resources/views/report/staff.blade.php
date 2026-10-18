@@ -28,7 +28,35 @@
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
 
-        <a href="{{ route('logout') }}" class="logout-btn">↩ Logout</a>
+        <div class="user-profile-container">
+            <!-- เมนู Dropdown (ซ่อนไว้เริ่มต้น) -->
+            <div class="profile-dropdown-menu" id="profileDropdown">
+                <a href="#" class="dropdown-item text-danger" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    ออกจากระบบ
+                </a>
+            </div>
+            
+            <!-- ปุ่มกดดูโปรไฟล์ -->
+        <div class="user-profile-toggle" onclick="toggleProfileDropdown()">
+            <div class="avatar">
+                <!-- ดึงตัวอักษรตัวแรกมาแสดง (เช็คเผื่อชื่อฟิลด์ต่างๆ และป้องกันค่าว่าง) -->
+                @php
+                    $displayName = 'User';
+                    if(Auth::check()) {
+                        $user = Auth::user();
+                        $displayName = $user->name ?? $user->staff_name ?? $user->first_name ?? $user->username ?? 'User';
+                    }
+                @endphp
+                {{ mb_strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'), 'UTF-8') }}
+            </div>
+            
+            <div class="user-info">
+                <!-- แสดงชื่อเต็ม -->
+                <div class="user-name">{{ $displayName }}</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
+        </div>
     </aside>
 
     <main class="content">
@@ -261,5 +289,23 @@
             });
         }
     </script>
+
+    <script>
+    function toggleProfileDropdown() {
+        const dropdown = document.getElementById('profileDropdown');
+        const container = document.querySelector('.user-profile-container');
+        dropdown.classList.toggle('show');
+        container.classList.toggle('open');
+    }
+    
+    // คลิกพื้นที่อื่นบนหน้าจอเพื่อปิด Dropdown อัตโนมัติ
+    window.addEventListener('click', function(e) {
+        const container = document.querySelector('.user-profile-container');
+        if (container && !container.contains(e.target)) {
+            document.getElementById('profileDropdown').classList.remove('show');
+            container.classList.remove('open');
+        }
+    });
+</script>
 </body>
 </html>

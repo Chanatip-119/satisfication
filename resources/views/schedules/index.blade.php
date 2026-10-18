@@ -22,7 +22,38 @@
         <a href="{{ url('/qrcode') }}" class="menu-item {{ request()->is('/qrcode') ? 'active' : '' }}">QR Code</a>
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
-        <a href="{{ route('logout') }}" class="logout-btn">↩ Logout</a>
+        <div class="user-profile-container">
+            <!-- เมนู Dropdown (ซ่อนไว้เริ่มต้น) -->
+            <div class="profile-dropdown-menu" id="profileDropdown">
+                <a href="#" class="dropdown-item text-danger" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    ออกจากระบบ
+                </a>
+            </div>
+            
+            <!-- ปุ่มกดดูโปรไฟล์ -->
+            <div class="user-profile-toggle" onclick="toggleProfileDropdown()">
+                <div class="avatar">
+                    @php
+                        $displayName = 'User';
+                        if(Auth::check()) {
+                            $user = Auth::user();
+                            $displayName = $user->name ?? $user->staff_name ?? $user->first_name ?? $user->username ?? 'User';
+                        }
+                    @endphp
+                    {{ mb_strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'), 'UTF-8') }}
+                </div>
+                
+                <div class="user-info">
+                    <div class="user-name">{{ $displayName }}</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </div>
+            
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                @csrf
+            </form>
+        </div>
     </div>
 
     <div class="content">
@@ -74,7 +105,6 @@
             </div>
         </div>
 
-        <!-- แถบสัญลักษณ์สีแสดงสถานะตามจริง (Figma Legend) -->
         <div class="status-legend-row">
             <div class="legend-item"><span class="legend-box checkin"></span> Check-in อยู่</div>
             <div class="legend-item"><span class="legend-box waiting"></span> มีตาราง รอ Check-in</div>
@@ -155,9 +185,7 @@
         </div>
     </div>
 
-    <!-- ============================================== -->
     <!-- Modal: รายเคาน์เตอร์ & Subcounter -->
-    <!-- ============================================== -->
     <div id="counterViewModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 650px; max-height: 85vh; overflow-y: auto;">
             <div class="modal-header">
@@ -238,9 +266,7 @@
         </div>
     </div>
 
-    <!-- ============================================== -->
     <!-- Modal: Import Excel -->
-    <!-- ============================================== -->
     <div id="importModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 550px;">
             <div class="modal-header">
@@ -295,9 +321,7 @@
         </div>
     </div>
 
-    <!-- ============================================== -->
     <!-- Modal: เพิ่มตารางปฏิบัติงาน -->
-    <!-- ============================================== -->
     <div id="addModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 650px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
@@ -317,8 +341,9 @@
             <form action="{{ route('schedule.store') }}" method="POST" id="addScheduleForm">
                 @csrf
                 
+                <!-- STEP 1: เลือกเคาน์เตอร์ -->
                 <div id="stepContent1" class="step-content active">
-                    <div style="font-weight: 700; font-size: 14px; color: #1a202c; margin-bottom: 15px;">1. เลือกเคาน์เตอร์หลัก</div>
+                    <div style="font-weight: 700; font-size: 14px; color: #1a202c; margin-bottom: 15px;">เลือกเคาน์เตอร์หลัก</div>
                     <div class="radio-card-grid">
                         <?php foreach($counters as $counter): ?>
                             <label class="radio-card" onclick="selectMainCounter('{{ $counter->counter_id }}', 'เคาน์เตอร์ {{ $counter->counter_id }}')">
@@ -331,28 +356,35 @@
                         <?php endforeach; ?>
                     </div>
 
+                    <!-- ส่วนแสดงเคาน์เตอร์ย่อย -->
                     <div id="subCounterSection" style="display: none; margin-top: 25px; padding-top: 20px; border-top: 1px dashed #cbd5e0;">
                         <div style="font-weight: 700; font-size: 14px; color: #1a202c; margin-bottom: 15px;">2. เลือกเคาน์เตอร์ย่อย <span id="selectedMainCounterLabel" style="color: #8b5cf6;"></span></div>
                         
                         <?php foreach($counters as $counter): ?>
-                            <div id="sub_list_{{ $counter->counter_id }}" class="sub-counter-list" style="display: none;">
-                                <?php 
-                                $subCount = 1;
-                                foreach($counter->countersubs as $sub): 
-                                ?>
-                                    <label class="radio-card" onclick="updateSummary()">
-                                        <input type="radio" name="counter_sub_id" value="{{ $sub->counter_sub_id }}" required>
-                                        <div>
-                                            <div style="font-weight: 700; color: #1a202c; font-size: 14px;">จุดบริการที่ {{ $subCount++ }}</div>
-                                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">(Sub ID: {{ $sub->counter_sub_id }})</div>
-                                        </div>
-                                    </label>
-                                <?php endforeach; ?>
-                                
-                                <?php if($counter->countersubs->count() == 0): ?>
-                                    <div style="font-size: 13px; color: #e53e3e; padding: 10px;">ไม่มีเคาน์เตอร์ย่อยในระบบ กรุณาติดต่อแอดมิน</div>
-                                <?php endif; ?>
-                            </div>
+                            <?php if(!in_array((string)$counter->counter_id, ['4', '5'])): ?>
+                                <div id="sub_list_{{ $counter->counter_id }}" class="sub-counter-list" style="display: none;">
+                                    <?php 
+                                    $subCount = 1;
+                                    foreach($counter->countersubs as $sub): 
+                                    ?>
+                                        <label class="radio-card" onclick="updateSummary()">
+                                            <input type="radio" name="counter_sub_id" value="{{ $sub->counter_sub_id }}">
+                                            <div>
+                                                <div style="font-weight: 700; color: #1a202c; font-size: 14px;">จุดบริการที่ {{ $subCount++ }}</div>
+                                                <div style="font-size: 12px; color: #718096; margin-top: 2px;">(Sub ID: {{ $sub->counter_sub_id }})</div>
+                                            </div>
+                                        </label>
+                                    <?php endforeach; ?>
+                                    
+                                    <?php if($counter->countersubs->count() == 0): ?>
+                                        <div style="font-size: 13px; color: #e53e3e; padding: 10px;">ไม่มีเคาน์เตอร์ย่อยในระบบ กรุณาติดต่อแอดมิน</div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div id="sub_list_{{ $counter->counter_id }}" style="display: none;">
+                                    <input type="radio" name="counter_sub_id" value="{{ $counter->countersubs->first()?->counter_sub_id ?? '' }}" id="auto_sub_{{ $counter->counter_id }}" style="display: none;">
+                                </div>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
 
@@ -362,6 +394,7 @@
                     </div>
                 </div>
 
+                <!-- STEP 2: กำหนดเวลา -->
                 <div id="stepContent2" class="step-content">
                     <div style="display: flex; gap: 20px; margin-bottom: 20px;">
                         <div class="form-group" style="flex: 1; margin: 0;"><label class="form-label">เวลาเริ่ม</label><input type="time" name="start_time" id="add_start_time" class="form-control" onchange="updateSummary(); validateAddScheduleConflicts();" required></div>
@@ -392,6 +425,7 @@
                     </div>
                 </div>
 
+                <!-- STEP 3: มอบหมายคน -->
                 <div id="stepContent3" class="step-content">
                     <div class="summary-box">
                         <div class="summary-item"><div class="label">เคาน์เตอร์</div><div class="value" id="summary_counter">-</div></div>
@@ -453,9 +487,7 @@
         </div>
     </div>
 
-    <!-- ============================================== -->
     <!-- Modal: จัดการตาราง (Edit / Substitute / History) -->
-    <!-- ============================================== -->
     <div id="complexEditModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 550px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
@@ -561,7 +593,7 @@
                         <button type="submit" id="btnSubmitEditSub" class="btn btn-yellow" style="width: 100%; justify-content: center; padding: 12px 0;">ยืนยัน Assign คนแทน</button>
                     </form>
                 </div>
-                
+
                 <form id="sickUpdateForm" method="POST" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                     @csrf
                     <input type="hidden" name="staff_id" id="s_edit_staff">
@@ -626,26 +658,59 @@
             }, 300);
         }
 
+        // ==========================================
+        // อัปเดตฟังก์ชัน selectMainCounter ตามโจทย์ล่าสุด
+        // (ให้เคาน์เตอร์ 4 และ 5 รอผู้ใช้กด 'ถัดไป' เอง โดยไม่ต้องเลือก Sub-counter)
+        // ==========================================
         function selectMainCounter(counterId, counterName) {
             document.querySelectorAll('.sub-counter-list').forEach(el => el.style.display = 'none');
+            // เคลียร์ค่าที่เลือกไว้ก่อนหน้า เพื่อป้องกันค่าค้าง
             document.querySelectorAll('input[name="counter_sub_id"]').forEach(el => el.checked = false);
             
-            let subList = document.getElementById('sub_list_' + counterId);
-            if(subList) {
-                subList.style.display = 'grid'; 
-                document.getElementById('subCounterSection').style.display = 'block';
-                document.getElementById('selectedMainCounterLabel').innerText = '— ' + counterName;
+            if (counterId === '4' || counterId === '5') {
+                // เคาน์เตอร์ 4 และ 5: ซ่อนกล่องเลือก Sub-counter
+                document.getElementById('subCounterSection').style.display = 'none';
+                
+                // หากหลังบ้านบังคับส่งค่า Sub ให้ติ๊ก input ซ่อนไว้ให้เผื่อระบบต้องการค่า
+                let autoSub = document.getElementById('auto_sub_' + counterId);
+                if(autoSub) autoSub.checked = true;
+                
+                updateSummary();
+                // *** ลบ nextStep(2) ออก เพื่อให้รอผู้ใช้กดปุ่ม 'ถัดไป' ด้วยตัวเอง ***
+            } else {
+                // เคาน์เตอร์อื่นบังคับแสดงกล่อง Sub-counter ตามปกติ
+                let subList = document.getElementById('sub_list_' + counterId);
+                if(subList) {
+                    subList.style.display = 'grid'; 
+                    document.getElementById('subCounterSection').style.display = 'block';
+                    document.getElementById('selectedMainCounterLabel').innerText = '— ' + counterName;
+                }
+                updateSummary();
             }
-            updateSummary();
         }
 
         function nextStep(step) {
             if (step === 2) {
+                // ตรวจสอบหน้าแรก (Step 1)
                 let checkedMain = document.querySelector('input[name="main_counter_id"]:checked');
-                let checkedSub = document.querySelector('input[name="counter_sub_id"]:checked');
-                if (!checkedMain) { alert("กรุณาเลือกเคาน์เตอร์หลักก่อนครับ"); return; }
-                if (!checkedSub) { alert("กรุณาเลือกเคาน์เตอร์ย่อยด้วยครับ"); return; }
+                
+                // ถ้ายกด 'ถัดไป' แต่ยังไม่เลือกเคาน์เตอร์หลักเลย ให้แจ้งเตือน
+                if (!checkedMain) { 
+                    alert("กรุณาเลือกเคาน์เตอร์หลักก่อนครับ"); 
+                    return; 
+                }
+                
+                let mainVal = checkedMain.value;
+                // ตรวจสอบว่าถ้าไม่ใช่ 4 และ 5 บังคับว่าต้องเลือกเคาน์เตอร์ย่อยด้วย
+                if (mainVal !== '4' && mainVal !== '5') {
+                    let checkedSub = document.querySelector('input[name="counter_sub_id"]:checked');
+                    if (!checkedSub) { 
+                        alert("กรุณาเลือกเคาน์เตอร์ย่อยด้วยครับ"); 
+                        return; 
+                    }
+                }
             }
+            
             if (step === 3) {
                 let start = document.getElementById('add_start_time').value;
                 let end = document.getElementById('add_end_time').value;
@@ -707,7 +772,8 @@
             
             if (checkedMain) {
                 let mainName = checkedMain.nextElementSibling.querySelector('div').innerText;
-                if(checkedSub) {
+                // สำหรับ 4,5 ไม่ต้องโชว์ชื่อเคาน์เตอร์ย่อยในส่วนสรุป
+                if(checkedSub && checkedMain.value !== '4' && checkedMain.value !== '5') {
                     let subName = checkedSub.nextElementSibling.querySelector('div').innerText;
                     document.getElementById('summary_counter').innerText = mainName + " (" + subName + ")";
                 } else {
@@ -893,7 +959,6 @@
             }, 1000);
         }
 
-        // ใช้ค่า 'sick' และ 'empty' ให้ตรงกับ ENUM ในฐานข้อมูลจริง 100%
         function toggleSick() {
             let btn = document.getElementById('btnToggleSick');
             let statusInput = document.getElementById('s_edit_status');
@@ -921,7 +986,6 @@
             document.getElementById('displayStaffCode').innerText = 'BUU-' + String(staffId).padStart(3, '0') + ' • บุคลากรหลัก';
             document.getElementById('displayStaffTime').innerText = startShort + '–' + endShort;
 
-            // ตรวจสอบสถานะจาก Backend ร่วมกับวันและเวลาตามความเป็นจริง
             let statusEl = document.getElementById('displayStatusText');
             let cardBox = document.getElementById('primaryStaffCardBox');
             let now = new Date();
@@ -943,7 +1007,6 @@
                 cardBox.style.background = '#edf2f7';
                 cardBox.style.borderColor = '#cbd5e0';
             } else {
-                // กรณีในฐานข้อมูลเป็น 'waiting' หรือ 'empty' (ยังไม่ได้ Check-in)
                 if (now > slotEnd) {
                     statusEl.innerText = 'สิ้นสุดเวลา (ไม่ได้ Check-in)';
                     statusEl.style.color = '#718096';
@@ -1158,6 +1221,21 @@
                         handleImportFileSelect(fileInput);
                     }
                 }, false);
+            }
+        });
+
+        function toggleProfileDropdown() {
+            const dropdown = document.getElementById('profileDropdown');
+            const container = document.querySelector('.user-profile-container');
+            dropdown.classList.toggle('show');
+            container.classList.toggle('open');
+        }
+        
+        window.addEventListener('click', function(e) {
+            const container = document.querySelector('.user-profile-container');
+            if (container && !container.contains(e.target)) {
+                document.getElementById('profileDropdown').classList.remove('show');
+                container.classList.remove('open');
             }
         });
     </script>

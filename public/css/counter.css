@@ -182,3 +182,109 @@ td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middl
 .logout-btn:hover {
     opacity: 0.85;
 }
+
+/* =========================================
+   User Profile Sidebar Section
+========================================= */
+.sidebar {
+    position: relative; /* สำคัญ: เพื่อให้กล่องโปรไฟล์เกาะอยู่ด้านล่างสุดของ Sidebar ได้ */
+    padding-bottom: 80px; /* เว้นที่ว่างด้านล่างไม่ให้เมนูอื่นๆ โดนโปรไฟล์บัง */
+}
+
+.user-profile-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.user-profile-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 20px;
+    color: #333;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.user-profile-toggle:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.avatar {
+    width: 38px;
+    height: 38px;
+    background-color: #fff;
+    color: #e5a900;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+.user-info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.user-role {
+    font-size: 12px;
+    color: #555;
+}
+
+.profile-dropdown-menu {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    background-color: #fff;
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+    z-index: 100;
+}
+
+.profile-dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    color: #333;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-item.text-danger {
+    color: #e53e3e;
+}
+
+.chevron-icon {
+    transition: transform 0.3s;
+}
+
+.user-profile-container.open .chevron-icon {
+    transform: rotate(180deg);
+}

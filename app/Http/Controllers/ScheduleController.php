@@ -33,6 +33,18 @@ class ScheduleController extends Controller
                   ->orderBy('schedule_id', 'asc'); 
         }])->where('is_active', true)->get();
 
+        // ตรวจสอบเคาน์เตอร์เดี่ยว (เช่น 4, 5 หรือเคาน์เตอร์ที่ยังไม่มีจุดย่อย) ให้มี CounterSub เริ่มต้นเสมอ
+        foreach ($counters as $c) {
+            if ($c->countersubs->isEmpty()) {
+                $defaultSub = \App\Models\CounterSub::firstOrCreate(
+                    ['counter_id' => $c->counter_id],
+                    ['is_active' => true]
+                );
+                $defaultSub->setRelation('schedules', collect([]));
+                $c->setRelation('countersubs', collect([$defaultSub]));
+            }
+        }
+
         // สร้าง Map จับคู่ counter_sub_id กับ counter_id เพื่อใช้แสดงชื่อเคาน์เตอร์ตอนเกิด Conflict
         $subToCounterMap = [];
         foreach ($counters as $c) {
