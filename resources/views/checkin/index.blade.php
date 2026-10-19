@@ -217,7 +217,7 @@
             </div>
 
             <div class="filter-group">
-                <div class="filter-tag active" id="btn-filter-all" onclick="filterReviews('all')">ทั้งหมด (<span id="filter-total-count">{{ $review_stats->total }}</span>)</div>
+                <div class="filter-tag primary active" id="btn-filter-all" onclick="filterReviews('all')">ทั้งหมด (<span id="filter-all-count">{{ $review_stats->total }}</span>)</div>
                 <div class="filter-tag danger" id="btn-filter-neg" onclick="filterReviews('negative')">เชิงลบ (<span id="filter-neg-count">{{ $review_stats->negative }}</span>)</div>
             </div>
 
@@ -284,124 +284,126 @@
 
     @if($step == 4)
     <script>
-        // ฟังก์ชันจัดการแท็บรีวิว
-        let currentFilter = 'all';
+    // ฟังก์ชันจัดการแท็บรีวิวและสลับสีปุ่ม
+    let currentFilter = 'all';
 
-        function filterReviews(type) {
-            currentFilter = type;
-            const items = document.querySelectorAll('.review-item');
-            const btnAll = document.getElementById('btn-filter-all');
-            const btnNeg = document.getElementById('btn-filter-neg');
+    function filterReviews(type) {
+        currentFilter = type;
+        const items = document.querySelectorAll('.review-item');
+        const btnAll = document.getElementById('btn-filter-all');
+        const btnNeg = document.getElementById('btn-filter-neg');
 
-            if (btnAll && btnNeg) {
-                if (type === 'all') {
-                    btnAll.classList.add('active');
-                    btnNeg.classList.remove('active');
-                } else {
-                    btnNeg.classList.add('active');
-                    btnAll.classList.remove('active');
-                }
+        // สลับสถานะและสีปุ่ม (เพิ่ม-ลด class .active)
+        if (btnAll && btnNeg) {
+            if (type === 'all') {
+                btnAll.classList.add('active');
+                btnNeg.classList.remove('active');
+            } else if (type === 'negative') {
+                btnNeg.classList.add('active');
+                btnAll.classList.remove('active');
             }
-
-            items.forEach(item => {
-                const rating = parseInt(item.getAttribute('data-rating') || '5');
-                if (type === 'all') {
-                    item.style.display = 'block';
-                } else if (type === 'negative') {
-                    if (rating <= 2) {
-                        item.style.display = 'block';
-                    } else {
-                        item.style.display = 'none';
-                    }
-                }
-            });
         }
 
-        (function () {
-            // บล็อกไม่ให้สคริปต์หน้าบ้านพ่น error เวลา fetch
-            const originalFetch = window.fetch;
-            window.fetch = function (url, options) {
-                if (typeof url === 'string' && url.includes('/api/my-reviews')) {
-                    return new Promise(() => {}); 
+        // คัดกรองการแสดงผลรีวิว (ดาว)
+        items.forEach(item => {
+            const rating = parseInt(item.getAttribute('data-rating') || '5');
+            if (type === 'all') {
+                item.style.display = 'block';
+            } else if (type === 'negative') {
+                if (rating <= 2) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
                 }
-                return originalFetch.apply(this, arguments);
-            };
-
-            // อัปเดตรีวิวและเวลาแบบเรียลไทม์
-            function pollLatestReviews() {
-                if (!window.location.search.includes('active_checkin_id')) return;
-
-                originalFetch(window.location.href, {
-                    method: 'GET',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                    cache: 'no-store'
-                })
-                .then(res => {
-                    if (!res.ok) throw new Error('Network error');
-                    return res.text();
-                })
-                .then(html => {
-                    if (!html) return;
-                    
-                    let parser = new DOMParser();
-                    let doc = parser.parseFromString(html, 'text/html');
-
-                    // ถ้าไม่มีเครื่องหมายถูกสีเขียว = หมดเวลาโดนเตะออกแล้ว ให้เด้งกลับหน้าแรกทันที
-                    if (!doc.querySelector('.success-icon')) {
-                        window.location.replace("{{ url('/checkin') }}");
-                        return;
-                    }
-
-                    // 1. อัปเดตแถบแจ้งเตือน 15 นาที
-                    let newNotifBar = doc.querySelector('.notification-bar');
-                    let currentNotifBar = document.querySelector('.notification-bar');
-
-                    if (newNotifBar && !currentNotifBar) {
-                        document.body.insertBefore(newNotifBar.cloneNode(true), document.body.firstChild);
-                    } else if (!newNotifBar && currentNotifBar) {
-                        currentNotifBar.remove();
-                    } else if (newNotifBar && currentNotifBar) {
-                        currentNotifBar.innerHTML = newNotifBar.innerHTML;
-                    }
-
-                    // 2. เช็คว่ามีรีวิวใหม่เข้ามาไหม (ดูจากกล่องตัวเลข)
-                    let newTotal = doc.getElementById('stat-total-val') ? doc.getElementById('stat-total-val').innerText : '';
-                    let currentTotal = document.getElementById('stat-total-val') ? document.getElementById('stat-total-val').innerText : '';
-                    let newNeg = doc.getElementById('stat-neg-val') ? doc.getElementById('stat-neg-val').innerText : '';
-                    let currentNeg = document.getElementById('stat-neg-val') ? document.getElementById('stat-neg-val').innerText : '';
-
-                    // ถ้ารีวิวมีเพิ่ม/ลด ค่อยอัปเดตกล่องคอมเมนต์
-                    if (newTotal !== currentTotal || newNeg !== currentNeg) {
-                        
-                        // อัปเดตตัวเลขทุกจุดบนหน้าจอ
-                        const idsToUpdate = [
-                            'stat-avg-val', 'stat-total-val', 'stat-neg-val',
-                            'filter-total-count', 'filter-neg-count',
-                            'header-total-count', 'header-avg-val'
-                        ];
-                        
-                        idsToUpdate.forEach(id => {
-                            if (doc.getElementById(id) && document.getElementById(id)) {
-                                document.getElementById(id).innerText = doc.getElementById(id).innerText;
-                            }
-                        });
-
-                        // อัปเดตกล่องคอมเมนต์ด้านล่าง
-                        let newList = doc.getElementById('review-list-container');
-                        let curList = document.getElementById('review-list-container');
-                        if (newList && curList) {
-                            curList.innerHTML = newList.innerHTML;
-                            filterReviews(currentFilter); // ให้ค้างแท็บเดิมที่พนักงานกำลังกดดูอยู่
-                        }
-                    }
-                })
-                .catch(() => {});
             }
+        });
+    }
 
-            // ตั้งเวลาเช็คพื้นหลังทุก 4 วินาที
-            setInterval(pollLatestReviews, 4000);
-        })();
-    </script>
+    (function () {
+        // บล็อกไม่ให้สคริปต์หน้าบ้านพ่น error เวลา fetch
+        const originalFetch = window.fetch;
+        window.fetch = function (url, options) {
+            if (typeof url === 'string' && url.includes('/api/my-reviews')) {
+                return new Promise(() => {}); 
+            }
+            return originalFetch.apply(this, arguments);
+        };
+
+        // อัปเดตรีวิวและเวลาแบบเรียลไทม์
+        function pollLatestReviews() {
+            if (!window.location.search.includes('active_checkin_id')) return;
+
+            originalFetch(window.location.href, {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                cache: 'no-store'
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Network error');
+                return res.text();
+            })
+            .then(html => {
+                if (!html) return;
+                
+                let parser = new DOMParser();
+                let doc = parser.parseFromString(html, 'text/html');
+
+                // ถ้าไม่มีเครื่องหมายถูกสีเขียว = หมดเวลาโดนเตะออกแล้ว ให้เด้งกลับหน้าแรกทันที
+                if (!doc.querySelector('.success-icon')) {
+                    window.location.replace("{{ url('/checkin') }}");
+                    return;
+                }
+
+                // 1. อัปเดตแถบแจ้งเตือน 15 นาที
+                let newNotifBar = doc.querySelector('.notification-bar');
+                let currentNotifBar = document.querySelector('.notification-bar');
+
+                if (newNotifBar && !currentNotifBar) {
+                    document.body.insertBefore(newNotifBar.cloneNode(true), document.body.firstChild);
+                } else if (!newNotifBar && currentNotifBar) {
+                    currentNotifBar.remove();
+                } else if (newNotifBar && currentNotifBar) {
+                    currentNotifBar.innerHTML = newNotifBar.innerHTML;
+                }
+
+                // 2. เช็คว่ามีรีวิวใหม่เข้ามาไหม (ดูจากกล่องตัวเลข)
+                let newTotal = doc.getElementById('stat-total-val') ? doc.getElementById('stat-total-val').innerText : '';
+                let currentTotal = document.getElementById('stat-total-val') ? document.getElementById('stat-total-val').innerText : '';
+                let newNeg = doc.getElementById('stat-neg-val') ? doc.getElementById('stat-neg-val').innerText : '';
+                let currentNeg = document.getElementById('stat-neg-val') ? document.getElementById('stat-neg-val').innerText : '';
+
+                // ถ้ารีวิวมีเพิ่ม/ลด ค่อยอัปเดตกล่องคอมเมนต์
+                if (newTotal !== currentTotal || newNeg !== currentNeg) {
+                    
+                    // อัปเดตตัวเลขทุกจุดบนหน้าจอ
+                    const idsToUpdate = [
+                        'stat-avg-val', 'stat-total-val', 'stat-neg-val',
+                        'filter-total-count', 'filter-neg-count',
+                        'header-total-count', 'header-avg-val'
+                    ];
+                    
+                    idsToUpdate.forEach(id => {
+                        if (doc.getElementById(id) && document.getElementById(id)) {
+                            document.getElementById(id).innerText = doc.getElementById(id).innerText;
+                        }
+                    });
+
+                    // อัปเดตกล่องคอมเมนต์ด้านล่าง
+                    let newList = doc.getElementById('review-list-container');
+                    let curList = document.getElementById('review-list-container');
+                    if (newList && curList) {
+                        curList.innerHTML = newList.innerHTML;
+                        filterReviews(currentFilter); // ให้ค้างแท็บเดิมและคงสีปุ่มที่พนักงานกำลังกดดูอยู่
+                    }
+                }
+            })
+            .catch(() => {});
+        }
+
+        // ตั้งเวลาเช็คพื้นหลังทุก 4 วินาที
+        setInterval(pollLatestReviews, 4000);
+    })();
+</script>
     @endif
 </body>
 </html>

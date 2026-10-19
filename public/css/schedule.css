@@ -161,26 +161,27 @@ td:last-child { border-right: none; }
 .btn-danger:hover { background: #fed7d7; }
 
 /* =========================================
-   ระบบ คนแทน/ลาป่วย (Tab 2)
+   ระบบ คนแทน/ลาป่วย (Tab 2) - อัปเดตล่าสุด
    ========================================= */
 .sick-alert-box { 
     background: #fff5f5; 
     border: 1px solid #feb2b2; 
     padding: 20px; 
     border-radius: 8px; 
-    margin-bottom: 20px; 
+    margin-bottom: 25px; 
 }
 .btn-toggle-sick { 
     background: #fff5f5; 
     color: #e53e3e; 
     border: 1px solid #fc8181; 
-    padding: 10px; 
+    padding: 12px; 
     width: 100%; 
     border-radius: 6px; 
     font-weight: 600; 
     cursor: pointer; 
     transition: 0.2s; 
     text-align: center; 
+    font-size: 14px;
 }
 .btn-toggle-sick:hover { background: #fed7d7; }
 .btn-toggle-sick.active { 
@@ -189,7 +190,7 @@ td:last-child { border-right: none; }
     border-color: #e53e3e; 
 }
 
-/* กล่องรายชื่อคนแทน */
+/* กล่องรายชื่อคนแทน (Modal) */
 .substitute-card { 
     background: #faf5ff; 
     border: 1px solid #e9d8fd; 
@@ -217,33 +218,36 @@ td:last-child { border-right: none; }
 .btn-remove-sub:hover { background: #edf2f7; color: #e53e3e; }
 
 /* =========================================
-   ระบบ คนแทน/ลาป่วย (Tab 2) - Figma Update
+   การ์ดแสดงสถานะ "ลาป่วย/ไม่มา" บนตารางปฏิบัติงานหลัก
    ========================================= */
-.sick-alert-box { 
-    background: #fff5f5; 
-    border: 1px solid #feb2b2; 
-    padding: 20px; 
-    border-radius: 8px; 
-    margin-bottom: 25px; 
+.schedule-card.sick-card {
+    background-color: #fff5f5 !important;
+    border: 1px solid #fed7d7 !important;
+    border-left: 5px solid #fc8181 !important; /* แถบซ้ายสีแดงชัดเจน */
+    border-radius: 6px !important; 
+    box-shadow: none !important; /* ปิดเงาสีเขียว (ถ้ามี) */
 }
-.btn-toggle-sick { 
-    background: #fff5f5; 
-    color: #e53e3e; 
-    border: 1px solid #fc8181; 
-    padding: 12px; 
-    width: 100%; 
-    border-radius: 6px; 
-    font-weight: 600; 
-    cursor: pointer; 
-    transition: 0.2s; 
-    text-align: center; 
-    font-size: 14px;
+
+/* สีเวลาสำหรับคนที่ป่วย (สีแดง และไม่มีเส้นขีดฆ่า) */
+.schedule-card.sick-card .sick-text {
+    color: #e53e3e !important;
+    text-decoration: none !important; 
 }
-.btn-toggle-sick:hover { background: #fed7d7; }
-.btn-toggle-sick.active { 
-    background: #e53e3e; 
-    color: white; 
-    border-color: #e53e3e; 
+
+/* สีชื่อสำหรับคนที่ป่วย (สีเทา และไม่มีเส้นขีดฆ่า) */
+.schedule-card.sick-card .sick-line {
+    color: #718096 !important;
+    text-decoration: none !important; 
+}
+
+/* =========================================
+   ถ้ามีการระบุว่ามีคนแทน (Substitute) ให้เป็นสีม่วงอ่อน
+   ========================================= */
+.schedule-card.sub-card {
+    background-color: #faf5ff !important;
+    border: 1px solid #e9d8fd !important;
+    border-left: 5px solid #9f7aea !important;
+    border-radius: 6px !important; 
 }
 
 /* กล่องรายชื่อคนแทน (สีม่วงอ่อนแบบ Figma) */

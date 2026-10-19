@@ -101,10 +101,32 @@ body {
 .stat-value { font-size: 20px; font-weight: 700; color: #1a202c; }
 .stat-box.highlight .stat-value { color: #e53e3e; }
 
+/* Filter Tags - อัปเดตสีตามที่ผู้ใช้ต้องการ */
 .filter-group { display: flex; gap: 10px; margin-bottom: 16px; }
-.filter-tag { padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; background: #e2e8f0; color: #4a5568; transition: 0.2s; }
-.filter-tag.active { background: #1a202c; color: #fff; }
-.filter-tag.danger.active { background: #e53e3e; color: #fff; }
+
+/* สถานะเริ่มต้น (สีเทา) */
+.filter-tag { 
+    padding: 8px 16px; 
+    border-radius: 20px; 
+    font-size: 13px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    background: #e2e8f0; 
+    color: #4a5568; 
+    transition: 0.2s; 
+}
+
+/* บังคับปุ่ม "ทั้งหมด" (primary) ทำงาน (สีเหลืองทับสีดำ) */
+.filter-tag.primary.active { 
+    background: #ffcc00 !important; 
+    color: #1a202c !important; 
+}
+
+/* บังคับปุ่ม "เชิงลบ" (danger) ทำงาน (สีแดงทับสีดำ) */
+.filter-tag.danger.active { 
+    background: #e53e3e !important; 
+    color: #fff !important; 
+}
 
 .review-header-flex { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; margin-bottom: 12px; }
 .review-card { padding: 14px 12px; border-bottom: 1px solid #f0f4f8; }

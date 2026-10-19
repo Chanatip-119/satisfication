@@ -57,6 +57,10 @@
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
         </div>
+
+        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                @csrf
+        </form>
     </aside>
 
     <main class="content">
@@ -109,7 +113,7 @@
             <select name="status" class="dropdown-box" onchange="document.getElementById('search-form').submit();">
                 <option value="">ทุกสถานะ</option>
                 <option value="Active" {{ request('status') == 'Active' ? 'selected' : '' }}>Active</option>
-                <option value="Offline" {{ request('status') == 'Offline' ? 'selected' : '' }}>Offline</option>
+                <option value="Inactive" {{ request('status') == 'Inactive' ? 'selected' : '' }}>Inactive</option>
             </select>
         </form>
 
@@ -148,8 +152,9 @@
                             {{ $staff->staff_pincode }}
                         </td>
                         <td>
-                            <div class="status active">
-                                <div class="status-dot"></div> Active
+                            @php $isActive = ($staff->status ?? 'Inactive') === 'Active'; @endphp
+                            <div class="status {{ $isActive ? 'active' : 'offline' }}">
+                                <div class="status-dot"></div> {{ $isActive ? 'Active' : 'Inactive' }}
                             </div>
                         </td>
                         <td>

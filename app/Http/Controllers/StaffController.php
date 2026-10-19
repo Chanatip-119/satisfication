@@ -14,16 +14,35 @@ use Carbon\Carbon;
 
 class StaffController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $staffs = Staff::with('role')->get();
+        $query = Staff::with('role');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('staff_name', 'like', '%' . $search . '%')
+                    ->orWhereHas('role', function ($r) use ($search) {
+                        $r->where('role_name', 'like', '%' . $search . '%');
+                    });
+            });
+        }
+
+        $staffs = $query->get();
+
+        $loggedInStaffIds = $this->loggedInStaffIdSet();
 
         foreach ($staffs as $staff) {
-            $checkinIds = \App\Models\Checkin::where('staff_id', $staff->staff_id)->pluck('checkin_id');
-            $evaluations = \App\Models\Evaluation::whereIn('checkin_id', $checkinIds)->get();
+            $checkinIds = Checkin::where('staff_id', $staff->staff_id)->pluck('checkin_id');
+            $evaluations = Evaluation::whereIn('checkin_id', $checkinIds)->get();
             $staff->avg_rating = $evaluations->count() > 0
                 ? number_format($evaluations->avg('rating'), 1)
                 : '-';
+            $staff->status = isset($loggedInStaffIds[$staff->staff_id]) ? 'Active' : 'Inactive';
+        }
+
+        if ($request->filled('status')) {
+            $staffs = $staffs->where('status', $request->status)->values();
         }
 
         return view('staff.index', compact('staffs'));
@@ -76,7 +95,8 @@ class StaffController extends Controller
         $evaluations = Evaluation::whereIn('checkin_id', $checkinIds)->orderBy('evaluation_at', 'desc')->get();
 
         $activeCheckin = $checkins->whereNull('checkout_at')->first();
-        $status = $activeCheckin ? 'Active' : 'Offline';
+        $loggedInStaffIds = $this->loggedInStaffIdSet();
+        $status = isset($loggedInStaffIds[$staff->staff_id]) ? 'Active' : 'Inactive';
         $currentCounter = $activeCheckin && $activeCheckin->schedule ? '1.' . $activeCheckin->schedule->counter_sub_id : '-';
         $timeRange = $activeCheckin && $activeCheckin->schedule ? substr($activeCheckin->schedule->start_time, 0, 5) . '–' . substr($activeCheckin->schedule->end_time, 0, 5) : '-';
 
@@ -405,5 +425,26 @@ class StaffController extends Controller
             $staff->save();
         }
         return redirect()->route('staff.index')->with('success', 'Reset PIN Code ทั้งหมดสำเร็จ');
+    }
+
+    /**
+     * staff_id ที่มี session login ยังไม่หมดอายุ (จากตาราง sessions)
+     *
+     * @return \Illuminate\Support\Collection<int, int> keys เป็น staff_id สำหรับ isset lookup
+     */
+    private function loggedInStaffIdSet()
+    {
+        if (config('session.driver') !== 'database') {
+            return collect();
+        }
+
+        $minLastActivity = time() - ((int) config('session.lifetime') * 60);
+
+        return DB::table(config('session.table', 'sessions'))
+            ->whereNotNull('user_id')
+            ->where('last_activity', '>=', $minLastActivity)
+            ->distinct()
+            ->pluck('user_id')
+            ->flip();
     }
 }
