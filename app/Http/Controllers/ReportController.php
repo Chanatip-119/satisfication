@@ -49,6 +49,7 @@ class ReportController extends Controller
                 $timeRange = $schedule ? substr($schedule->start_time, 0, 5) . '–' . substr($schedule->end_time, 0, 5) : '08:00–16:00';
 
                 $countersList[] = (object)[
+                    'counter_name' => $counter->counter_location ?? ('เคาน์เตอร์ ' . $counter->counter_id),
                     'name' => $counter->counter_id . '.' . $sub->counter_sub_id,
                     'time' => $timeRange,
                     'avg_rating' => $avg,

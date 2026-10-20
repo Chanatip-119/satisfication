@@ -57,10 +57,6 @@
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
         </div>
-
-        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
-            @csrf
-        </form>
     </aside>
 
     <main class="content">
@@ -94,9 +90,10 @@
 
         <div class="table-card">
             <div class="table-title">ตารางเคาน์เตอร์ย่อย</div>
-            <table>
+            <table class="counter-report-table">
                 <thead>
                     <tr>
+                        <th>ชื่อเคาน์เตอร์</th>
                         <th>เคาน์เตอร์ย่อย</th>
                         <th>คะแนนเฉลี่ย</th>
                         <th>จำนวนการประเมิน</th>
@@ -107,6 +104,7 @@
                 <tbody>
                     @foreach($countersList as $c)
                     <tr>
+                        <td>{{ $c->counter_name }}</td>
                         <td>{{ $c->name }}</td>
                         <td>
                             <span class="rating-badge {{ $c->avg_rating >= 4 ? 'rating-good' : 'rating-bad' }}">

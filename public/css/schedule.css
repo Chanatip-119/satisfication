@@ -250,16 +250,15 @@ td:last-child { border-right: none; }
     border-radius: 6px !important; 
 }
 
-/* กล่องรายชื่อคนแทน (สีม่วงอ่อนแบบ Figma) */
-.substitute-card { 
-    background: #faf5ff; 
-    border: 1px solid #d6bcfa; 
-    padding: 15px; 
-    border-radius: 8px; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 12px; 
+/* บังคับสีเวลาของการ์ดคนแทน ให้เป็นสีม่วง */
+.schedule-card.sub-card .sick-text {
+    color: #805ad5 !important; /* สีม่วง */
+    text-decoration: none !important;
+}
+
+/* สีชื่อของคนหลักในการ์ดคนแทน (สีเทาจางลง เพราะถูกแทนที่แล้ว) */
+.schedule-card.sub-card .sick-line {
+    color: #718096 !important; /* สีเทา */
 }
 .sub-name { font-weight: 700; color: #1a202c; font-size: 14px; }
 .sub-time { font-size: 12px; color: #6b46c1; margin-top: 4px; font-weight: 600; }

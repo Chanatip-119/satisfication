@@ -181,3 +181,11 @@ td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middl
 .user-profile-container.open .chevron-icon {
     transform: rotate(180deg);
 }
+.counter-report-table { table-layout: fixed; }
+.counter-report-table th { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
+.counter-report-table th:nth-child(1), .counter-report-table td:nth-child(1) { width: 20%; text-align: left; }
+.counter-report-table th:nth-child(2), .counter-report-table td:nth-child(2) { width: 15%; }
+.counter-report-table th:nth-child(3), .counter-report-table td:nth-child(3) { width: 13%; }
+.counter-report-table th:nth-child(4), .counter-report-table td:nth-child(4) { width: 21%; }
+.counter-report-table th:nth-child(5), .counter-report-table td:nth-child(5) { width: 19%; }
+.counter-report-table th:nth-child(6), .counter-report-table td:nth-child(6) { width: 12%; }

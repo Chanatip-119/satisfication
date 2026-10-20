@@ -233,18 +233,30 @@
                     </div>
 
                     <div class="perf-group">
-                        <div class="perf-tag">สูงสุดวันนี้</div>
-                        <?php if($highestStaff): ?>
-                            <div class="perf-row">
-                                <div>
-                                    <div style="font-weight: 700; font-size: 14px; color: #1a202c;">{{ $highestStaff['name'] }}</div>
-                                    <div style="font-size: 12px; color: #718096; margin-top: 2px;">เคาน์เตอร์ {{ $highestStaff['counter_code'] }}</div>
-                                </div>
-                                <span class="score-badge-lg score-high">{{ number_format($highestStaff['avg_score'], 1) }}</span>
-                            </div>
-                        <?php else: ?>
-                            <div style="font-size: 12px; color: #a0aec0;">ยังไม่มีข้อมูลคะแนนประเมิน</div>
-                        <?php endif; ?>
+                    <!-- ใช้ if-else ของ Laravel Blade เช็คค่า $period เพื่อแสดงข้อความที่ถูกต้อง -->
+                        <div class="perf-tag">
+                            @if($period == 'week')
+                                สูงสุดสัปดาห์นี้
+                            @elseif($period == 'month')
+                                สูงสุดเดือนนี้
+                            @elseif($period == 'all')
+                                สูงสุดภาพรวม
+                            @else
+                                สูงสุดวันนี้
+                            @endif
+                    </div>
+
+                    <?php if($highestStaff): ?>
+                    <div class="perf-row">
+                        <div>
+                            <div style="font-weight: 700; font-size: 14px; color: #1a202c;">{{ $highestStaff['name'] }}</div>
+                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">เคาน์เตอร์ {{ $highestStaff['counter_code'] }}</div>
+                        </div>
+                        <span class="score-badge-lg score-high">{{ number_format($highestStaff['avg_score'], 1) }}</span>
+                    </div>
+                    <?php else: ?>
+                        <div style="font-size: 12px; color: #a0aec0;">ยังไม่มีข้อมูลคะแนนประเมิน</div>
+                    <?php endif; ?>
                     </div>
 
                     <div class="perf-group" style="padding-top: 14px;">
