@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="{{ asset('css/staff.css') }}?v={{ filemtime(public_path('css/staff.css')) }}">
 </head>
 <body>
+@php
+    $isEmployee = auth()->check() && auth()->user()->isEmployee();
+@endphp
 
     <aside class="sidebar">
         <div class="sidebar-logo">
@@ -26,7 +29,7 @@
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
 
         <div class="menu-category">ระบบ</div>
-        <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
+        @unless($isEmployee)<a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>@endunless
 
         <div class="user-profile-container">
             <!-- เมนู Dropdown (ซ่อนไว้เริ่มต้น) -->
@@ -57,10 +60,6 @@
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
         </div>
-
-        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
-                @csrf
-        </form>
     </aside>
 
     <main class="content">
@@ -68,13 +67,15 @@
         <div class="header-row">
             <div class="page-title">
                 <h1>จัดการบุคลากร</h1>
-                <p>เพิ่ม แก้ไข รีเซ็ต PIN Code (Unique ID 4 หลัก)</p>
+                @if($isEmployee)<p>ดูรายชื่อบุคลากรและผลการปฏิบัติงาน</p>@else<p>เพิ่ม แก้ไข รีเซ็ต PIN Code (Unique ID 4 หลัก)</p>@endif
             </div>
             <div class="action-buttons">
+                @unless($isEmployee)
                 <button class="btn" onclick="openModal('modal-reset')"> Reset Unique ID ทั้งหมด</button>
                 <button class="btn" onclick="openModal('modal-import')"> Import Excel</button>
                 <a href="{{ route('staff.exportCsv') }}" class="btn"> Export CSV</a>
                 <button class="btn btn-yellow" onclick="openModal('modal-add-staff')">+ เพิ่มบุคลากร</button>
+                @endunless
             </div>
         </div>
 
@@ -103,10 +104,12 @@
         </div>
         @endif
 
+        @unless($isEmployee)
         <div class="alert-banner">
             <span> ตั้งค่ารีเซ็ต Unique ID อัตโนมัติ: ทุกวันที่ 1 ของเดือน— รีเซ็ตครั้งถัดไป 1 ก.ค. 2569</span>
             <a href="javascript:void(0)" onclick="openModal('modal-reset')">แก้ไขการตั้งค่า</a>
         </div>
+        @endunless
 
         <form action="{{ route('staff.index') }}" method="GET" class="filter-row" id="search-form">
             <input type="text" name="search" class="search-box" placeholder="ค้นหาชื่อหรือบทบาท...." value="{{ request('search') }}">
@@ -124,9 +127,11 @@
                         <th>ชื่อ-นามสกุล</th>
                         <th>บทบาท</th>
                         <th>คะแนนเฉลี่ย</th>
+                        @unless($isEmployee)
                         <th>PIN CODE ( 4 หลัก )</th>
+                        @endunless
                         <th>สถานะ</th>
-                        <th>จัดการสิทธิ์</th>
+                        @if($isEmployee)<th>รายละเอียด</th>@else<th>จัดการสิทธิ์</th>@endif
                     </tr>
                 </thead>
                 <tbody>
@@ -148,9 +153,11 @@
                                 <span class="text-green">-</span>
                             @endif
                         </td>
+                        @unless($isEmployee)
                         <td>
                             {{ $staff->staff_pincode }}
                         </td>
+                        @endunless
                         <td>
                             @php $isActive = ($staff->status ?? 'Inactive') === 'Active'; @endphp
                             <div class="status {{ $isActive ? 'active' : 'offline' }}">
@@ -158,12 +165,14 @@
                             </div>
                         </td>
                         <td>
+                            @if($isEmployee)
+                            <button type="button" class="action-btn" onclick="openStaffPanel({{ $staff->staff_id }})">ดูรายละเอียด</button>
+                            @else
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <select class="dropdown-box role-select" data-staff-id="{{ $staff->staff_id }}" style="padding: 5px 10px; font-size: 13px; height: 32px;">
-                                    <option value="4" {{ $staff->role_id == 4 ? 'selected' : '' }}>Employee</option>
-                                    <option value="3" {{ $staff->role_id == 3 ? 'selected' : '' }}>Admin</option>
-                                    <option value="2" {{ $staff->role_id == 2 ? 'selected' : '' }}>SuperAdmin</option>
-                                    <option value="1" {{ $staff->role_id == 1 ? 'selected' : '' }}>Executive</option>
+                                    @foreach($roles as $role)
+                                    <option value="{{ $role->role_id }}" {{ (int) $staff->role_id === (int) $role->role_id ? 'selected' : '' }}>{{ $role->role_name }}</option>
+                                    @endforeach
                                 </select>
                                 
                                 <div class="action-dropdown">
@@ -200,6 +209,7 @@
                                     </div>
                                 </div>
                             </div>
+                            @endif
                         </td>
                     </tr>
                     @endforeach
@@ -257,15 +267,18 @@
                         <span class="sp-info-label">ช่วงเวลาวันนี้</span>
                         <span class="sp-info-val" id="sp-time-range">-</span>
                     </div>
+                    @unless($isEmployee)
                     <div class="sp-info-item">
                         <span class="sp-info-label">PIN Code</span>
                         <span class="sp-info-val" id="sp-pin">-</span>
                     </div>
+                    @endunless
                 </div>
 
                 <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">สัดส่วนคะแนนที่ได้รับ</h4>
                 <div id="sp-progress-container"></div>
                 
+                @unless($isEmployee)
                 <h4 style="font-size: 13px; color: #718096; margin: 25px 0 15px;">การดำเนินการ</h4>
                 <div style="display:flex; flex-direction: column; gap: 10px;">
                     <button class="action-btn" style="width: 100%; justify-content: center; height: 38px;">ส่ง PIN ซ้ำ (Gmail)</button>
@@ -273,6 +286,7 @@
                     <button class="action-btn" style="width: 100%; justify-content: center; height: 38px;">Export รายงาน</button>
                     <button class="action-btn text-danger" style="width: 100%; justify-content: center; height: 38px; border-color: #fc8181; background: #fff5f5;">ลบบัญชีถาวร</button>
                 </div>
+                @endunless
             </div>
 
             <div id="sp-tab-history" class="sp-section">
@@ -287,6 +301,7 @@
         </div>
     </div>
 
+    @unless($isEmployee)
     <div id="modal-add-staff" class="modal-overlay">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header-flex">
@@ -334,34 +349,15 @@
                 <div class="form-group full-width">
                     <label style="margin-bottom: 10px; display: block;">สิทธิ์การใช้งาน</label>
                     <div class="role-selector">
+                        @foreach($roles as $role)
                         <label class="role-radio">
-                            <input type="radio" name="role_id" value="1">
+                            <input type="radio" name="role_id" value="{{ $role->role_id }}" {{ (int) $role->role_id === \App\Models\Staff::ROLE_EMPLOYEE ? 'checked' : '' }}>
                             <div class="radio-card">
                                 <span class="radio-circle"></span>
-                                Executive
+                                {{ $role->role_name }}
                             </div>
                         </label>
-                        <label class="role-radio">
-                            <input type="radio" name="role_id" value="2">
-                            <div class="radio-card">
-                                <span class="radio-circle"></span>
-                                SuperAdmin
-                            </div>
-                        </label>
-                        <label class="role-radio">
-                            <input type="radio" name="role_id" value="3" checked>
-                            <div class="radio-card">
-                                <span class="radio-circle"></span>
-                                Admin
-                            </div>
-                        </label>
-                        <label class="role-radio">
-                            <input type="radio" name="role_id" value="4">
-                            <div class="radio-card">
-                                <span class="radio-circle"></span>
-                                Employee
-                            </div>
-                        </label>
+                        @endforeach
                     </div>
                 </div>
 
@@ -464,6 +460,8 @@
             </form>
         </div>
     </div>
+
+    @endunless
 
     <script>
         function openModal(modalId) {
@@ -595,7 +593,9 @@
                 const staffId = this.dataset.staffId;
                 const roleId = this.value;
                 const selectEl = this;
-                const originalValue = selectEl.dataset.originalValue || selectEl.querySelector('[selected]')?.value;
+                const originalValue = selectEl.dataset.originalValue;
+
+                showRoleToast('กำลังบันทึกสิทธิ์...', false);
 
                 fetch('/staff/' + staffId, {
                     method: 'PUT',
@@ -607,27 +607,52 @@
                     },
                     body: JSON.stringify({ role_id: roleId })
                 })
-                .then(res => {
-                    if (!res.ok) throw new Error('Server error');
-                    return res.json();
+                .then(async res => {
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        const validationMessage = Object.values(data.errors || {}).flat()[0];
+                        if (res.status === 419) {
+                            throw new Error('เซสชันหมดอายุ กรุณารีเฟรชหน้าแล้วลองใหม่');
+                        }
+                        throw new Error(data.message || validationMessage || `บันทึกไม่สำเร็จ (รหัส ${res.status})`);
+                    }
+                    return data;
                 })
                 .then(data => {
                     const row = selectEl.closest('tr');
                     const badge = row.querySelector('.badge');
-                    const roleNames = { '1': 'Executive', '2': 'SuperAdmin', '3': 'Admin', '4': 'Employee' };
-                    if (badge) badge.textContent = roleNames[roleId] || 'Staff';
+                    const roleLabel = selectEl.options[selectEl.selectedIndex]?.text || 'Staff';
+                    if (badge) badge.textContent = roleLabel;
 
+                    selectEl.dataset.originalValue = roleId;
                     selectEl.style.borderColor = '#48bb78';
                     setTimeout(() => { selectEl.style.borderColor = ''; }, 1500);
+                    showRoleToast(data.message || 'เปลี่ยน role สำเร็จ', false);
                 })
                 .catch(err => {
-                    alert('เกิดข้อผิดพลาดในการอัปเดตสิทธิ์: ' + err.message);
                     if (originalValue) selectEl.value = originalValue;
+                    showRoleToast(err.message || 'เกิดข้อผิดพลาดในการอัปเดตสิทธิ์', true);
                 });
             });
 
             select.dataset.originalValue = select.value;
         });
+
+        function showRoleToast(message, isError) {
+            let toast = document.getElementById('staff-role-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'staff-role-toast';
+                toast.style.cssText = 'position:fixed;right:24px;bottom:24px;z-index:3000;max-width:min(420px,calc(100vw - 32px));padding:14px 18px;border-radius:10px;color:#fff;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.18);transition:opacity .2s;';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.style.background = isError ? '#c53030' : '#276749';
+            toast.style.opacity = '1';
+            toast.setAttribute('role', isError ? 'alert' : 'status');
+            clearTimeout(toast.hideTimer);
+            toast.hideTimer = setTimeout(() => { toast.style.opacity = '0'; }, isError ? 5000 : 2500);
+        }
 
         let searchTimer;
         document.querySelector('input[name="search"]').addEventListener('input', function() {

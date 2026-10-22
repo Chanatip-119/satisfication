@@ -10,6 +10,7 @@ use App\Models\Evaluation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class StaffController extends Controller
@@ -45,7 +46,9 @@ class StaffController extends Controller
             $staffs = $staffs->where('status', $request->status)->values();
         }
 
-        return view('staff.index', compact('staffs'));
+        $roles = Role::orderBy('role_id')->get();
+
+        return view('staff.index', compact('staffs', 'roles'));
     }
 
     public function create()
@@ -60,7 +63,10 @@ class StaffController extends Controller
             'staff_name' => 'required|string|max:255',
             'staff_email' => 'required|string|max:255',
             'staff_pincode' => 'required|string|max:255',
-            'role_id' => 'required|integer'
+            'role_id' => ['required', 'integer', Rule::exists('role', 'role_id')],
+        ], [
+            'role_id.required' => 'กรุณาเลือกบทบาทของบุคลากร',
+            'role_id.exists' => 'ไม่พบบทบาทนี้ในระบบ กรุณารีเฟรชหน้าแล้วเลือกใหม่',
         ]);
 
         
@@ -136,7 +142,7 @@ class StaffController extends Controller
         return response()->json([
             'name' => $staff->staff_name,
             'code' => 'BUU-' . str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT),
-            'pin' => $staff->staff_pincode,
+            'pin' => auth()->user()->isEmployee() ? null : $staff->staff_pincode,
             'avg_rating' => $avgRating,
             'total_checkins' => $checkins->count(),
             'total_comments' => $totalComments,
@@ -152,12 +158,15 @@ class StaffController extends Controller
 
     public function update(Request $request, $id)
     {
-        $request->validate([
-            'role_id' => 'required|integer|in:1,2,3,4'
+        $validated = $request->validate([
+            'role_id' => ['required', 'integer', Rule::exists('role', 'role_id')],
+        ], [
+            'role_id.required' => 'กรุณาเลือกบทบาท',
+            'role_id.exists' => 'ไม่พบบทบาทนี้ในระบบ กรุณารีเฟรชหน้าแล้วเลือกใหม่',
         ]);
 
         $staff = Staff::findOrFail($id);
-        $staff->role_id = $request->role_id;
+        $staff->role_id = $validated['role_id'];
         $staff->save();
 
         if ($request->expectsJson()) {

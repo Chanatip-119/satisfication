@@ -61,32 +61,47 @@ Route::middleware('auth')->group(function () {
 
     // จัดการตารางปฏิบัติงาน (Schedule)
     Route::get('/schedule', [ScheduleController::class, 'index'])->name('schedule.index');
-    Route::post('/schedule/store', [ScheduleController::class, 'store'])->name('schedule.store');
-    Route::post('/schedule/update/{id}', [ScheduleController::class, 'update'])->name('schedule.update');
-    Route::delete('/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->name('schedule.destroy');
-    Route::match(['get', 'delete'], '/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->name('schedule.destroy');
-    Route::post('/schedule/import', [ScheduleController::class, 'importExcel'])->name('schedule.import');
+    Route::post('/schedule/store', [ScheduleController::class, 'store'])->middleware('can:manage-admin')->name('schedule.store');
+    Route::post('/schedule/update/{id}', [ScheduleController::class, 'update'])->middleware('can:manage-admin')->name('schedule.update');
+    Route::delete('/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->middleware('can:manage-admin')->name('schedule.destroy');
+    Route::match(['get', 'delete'], '/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->middleware('can:manage-admin')->name('schedule.destroy');
+    Route::post('/schedule/import', [ScheduleController::class, 'importExcel'])->middleware('can:manage-admin')->name('schedule.import');
     Route::get('/schedule/download-template', [ScheduleController::class, 'downloadTemplate'])->name('schedule.downloadTemplate');
 
     // จัดการบุคลากร (Staff)
-    Route::get('/staff/export-csv', [StaffController::class, 'exportCsv'])->name('staff.exportCsv');
-    Route::get('/staff/download-template', [StaffController::class, 'downloadTemplate'])->name('staff.downloadTemplate');
-    Route::post('/staff/import', [StaffController::class, 'importExcel'])->name('staff.import');
-    Route::resource('staff', StaffController::class);
-    Route::post('/staff/reset-pins', [StaffController::class, 'resetAllPins'])->name('staff.resetPins');
+    Route::middleware('can:manage-admin')->group(function () {
+        Route::get('/staff/export-csv', [StaffController::class, 'exportCsv'])->name('staff.exportCsv');
+        Route::get('/staff/download-template', [StaffController::class, 'downloadTemplate'])->name('staff.downloadTemplate');
+        Route::post('/staff/import', [StaffController::class, 'importExcel'])->name('staff.import');
+        Route::post('/staff/reset-pins', [StaffController::class, 'resetAllPins'])->name('staff.resetPins');
+        Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
+        Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+        Route::match(['put', 'patch'], '/staff/{id}', [StaffController::class, 'update'])->name('staff.update');
+        Route::delete('/staff/{id}', [StaffController::class, 'destroy'])->name('staff.destroy');
+    });
+    Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+    Route::get('/staff/{id}', [StaffController::class, 'show'])->name('staff.show');
 
     // จัดการเคาน์เตอร์ (Counter)
-    Route::resource('counter', CounterController::class);
-    Route::post('/counter/{counterId}/sub', [CounterController::class, 'storeSub'])->name('counter.storeSub');
-    Route::delete('/counter/{counterId}/sub/{subId}', [CounterController::class, 'destroySub'])->name('counter.destroySub');
+    Route::get('/counter', [CounterController::class, 'index'])->name('counter.index');
+    Route::middleware('can:manage-admin')->group(function () {
+        Route::get('/counter/create', [CounterController::class, 'create'])->name('counter.create');
+        Route::post('/counter', [CounterController::class, 'store'])->name('counter.store');
+        Route::match(['put', 'patch'], '/counter/{id}', [CounterController::class, 'update'])->name('counter.update');
+        Route::delete('/counter/{id}', [CounterController::class, 'destroy'])->name('counter.destroy');
+        Route::post('/counter/{counterId}/sub', [CounterController::class, 'storeSub'])->name('counter.storeSub');
+        Route::delete('/counter/{counterId}/sub/{subId}', [CounterController::class, 'destroySub'])->name('counter.destroySub');
+    });
 
     // รายงาน (Reports)
     Route::get('/report/counter', [ReportController::class, 'counterReport'])->name('report.counter');
     Route::get('/report/staff', [ReportController::class, 'staffReport'])->name('report.staff');
 
-    // ส่งออกรายงาน (Export Report)
-    Route::get('/export-report', [ExportReportController::class, 'index'])->name('report.export.index');
-    Route::post('/export-report/download', [ExportReportController::class, 'export'])->name('report.export.download');
+    // ส่งออกรายงาน (Export Report) — จำกัดไว้สำหรับผู้ดูแล
+    Route::middleware('can:manage-admin')->group(function () {
+        Route::get('/export-report', [ExportReportController::class, 'index'])->name('report.export.index');
+        Route::post('/export-report/download', [ExportReportController::class, 'export'])->name('report.export.download');
+    });
 
     // จัดการ QR Code
     Route::get('/qrcode', [\App\Http\Controllers\QrCodeController::class, 'index'])->name('qrcode.index');

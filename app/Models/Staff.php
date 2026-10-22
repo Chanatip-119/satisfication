@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 
 class Staff extends Authenticatable
 {
+    public const ROLE_EMPLOYEE = 4;
     use Notifiable;
 
     protected $table = 'staff';
@@ -42,6 +43,11 @@ class Staff extends Authenticatable
         $this->notify(new \App\Notifications\ResetPasswordNotification($token));
     }
 
+
+    public function isEmployee(): bool
+    {
+        return (int) $this->role_id === self::ROLE_EMPLOYEE;
+    }
 
     protected $fillable = [
         'staff_name',
