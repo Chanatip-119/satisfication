@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    @php
+        $isEmployee = auth()->check() && auth()->user()->isEmployee();
+    @endphp
     
     <div class="sidebar">
         <div class="sidebar-logo"><img src="{{ asset('images/Buu-logo11.png') }}" alt="Logo"></div>
@@ -86,9 +89,11 @@
                 <p>ดูแลและแก้ไขว่าบุคลากรคนไหนอยู่เคาน์เตอร์ไหน ช่วงเวลาใด</p>
             </div>
             <div class="action-buttons">
+                @unless($isEmployee)
                 <button class="btn btn-outline"><i class="far fa-clock"></i> ตั้งเวลาเคาน์เตอร์</button>
-                <button class="btn btn-outline" onclick="openModal('importModal')"><i class="fas fa-file-excel"></i> Import Excel</button>
+                <button class="btn btn-outline" onclick="openModal('importModal')"></i> Import Excel</button>
                 <button class="btn btn-yellow" onclick="openModal('addModal')">+ เพิ่มตาราง</button>
+                @endunless
             </div>
         </div>
 
@@ -161,7 +166,7 @@
                                     ?>
                                                 @if(!empty($sch->staff_id) && $sch->staff_id > 0 && !empty($sch->staff) && !empty($sch->staff->staff_name))
                                                 <div class="schedule-card {{ $cardClass }}"
-                                                onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", {!! $substitutesData[$sch->schedule_id] ?? "[]" !!}, "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}")'>
+                                                @unless($isEmployee)onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", {!! $substitutesData[$sch->schedule_id] ?? "[]" !!}, "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}")'@endunless>
                                                     <div class="sch-time {{ $timeClass }}">{{ substr($sch->start_time,0,5) }} - {{ substr($sch->end_time,0,5) }}</div>
                                                     <div class="sch-name {{ $nameClass }}">{{ $sch->staff->staff_name ?? 'ไม่ระบุชื่อ' }}</div>
                                                     <?php if($hasSubs): ?>
@@ -266,6 +271,7 @@
         </div>
     </div>
 
+    @unless($isEmployee)
     <!-- Modal: Import Excel -->
     <div id="importModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 550px;">
@@ -613,6 +619,7 @@
             </div>
         </div>
     </div>
+    @endunless
 
     <!-- Scripts ควบคุมระบบทั้งหมด -->
     <script>

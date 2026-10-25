@@ -31,6 +31,7 @@ Route::middleware('guest')->group(function () {
     // Password Reset Routes
     Route::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'])->name('password.request');
     Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->name('password.email');
+    Route::post('/forgot-password/pin', [AuthController::class, 'resetPasswordWithPin'])->name('password.reset.pin');
     Route::get('/reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])->name('password.reset');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 });
@@ -76,6 +77,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/staff/reset-pins', [StaffController::class, 'resetAllPins'])->name('staff.resetPins');
         Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
         Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+        Route::post('/staff/{id}/reset-password', [StaffController::class, 'resetPassword'])->name('staff.resetPassword');
         Route::match(['put', 'patch'], '/staff/{id}', [StaffController::class, 'update'])->name('staff.update');
         Route::delete('/staff/{id}', [StaffController::class, 'destroy'])->name('staff.destroy');
     });

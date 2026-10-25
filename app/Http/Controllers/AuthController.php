@@ -54,7 +54,64 @@ class AuthController extends Controller
         // ส่งแจ้งเตือนทางอีเมล
         $staff->sendPasswordResetNotification($token);
 
-        return back()->with('status', 'ส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมลของคุณเรียบร้อยแล้ว กรุณาตรวจสอบกล่องข้อความ');
+        $resetUrl = route('password.reset', ['token' => $token, 'email' => $staff->staff_email]);
+
+        $redirect = back()->with('status', 'ส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมลของคุณเรียบร้อยแล้ว กรุณาตรวจสอบกล่องข้อความ');
+
+        // หากเป็นโหมด Log Mailer ให้แนบ Direct URL เพื่อความสะดวกในการทดสอบโดยไม่ต้องเปิด log
+        if (config('mail.default') === 'log') {
+            $redirect->with('direct_reset_url', $resetUrl);
+        }
+
+        return $redirect;
+    }
+
+    /**
+     * รีเซ็ตรหัสผ่านด้วยตัวเองโดยใช้ Email + รหัสพนักงาน + PIN Code (ไม่ต้องผ่านอีเมล)
+     */
+    public function resetPasswordWithPin(Request $request)
+    {
+        $request->validate([
+            'email' => ['required', 'email'],
+            'staff_id' => ['required', 'string'],
+            'pin' => ['required', 'string'],
+            'password' => ['required', 'confirmed', Password::min(6)],
+        ], [
+            'email.required' => 'กรุณากรอกอีเมลของคุณ',
+            'email.email' => 'รูปแบบอีเมลไม่ถูกต้อง',
+            'staff_id.required' => 'กรุณากรอกรหัสพนักงาน',
+            'pin.required' => 'กรุณากรอกรหัส PIN 4 หลัก',
+            'password.required' => 'กรุณากรอกรหัสผ่านใหม่',
+            'password.confirmed' => 'รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน',
+            'password.min' => 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร',
+        ]);
+
+        $staff = Staff::where('staff_email', $request->email)->first();
+
+        if (!$staff) {
+            return back()->withErrors(['pin_reset_error' => 'ไม่พบบัญชีผู้ใช้งานที่ตรงกับอีเมลนี้'])->withInput();
+        }
+
+        // ตรวจสอบ staff_id
+        $inputStaffIdNum = (int) preg_replace('/[^0-9]/', '', $request->staff_id);
+        if ($inputStaffIdNum <= 0 || (int)$staff->staff_id !== $inputStaffIdNum) {
+            return back()->withErrors(['pin_reset_error' => 'รหัสพนักงานไม่ตรงกับข้อมูลในระบบ'])->withInput();
+        }
+
+        // ตรวจสอบ PIN Code 4 หลัก
+        $inputPin = preg_replace('/[^0-9]/', '', $request->pin);
+        if (trim((string)$staff->staff_pincode) !== $inputPin) {
+            return back()->withErrors(['pin_reset_error' => 'รหัส PIN 4 หลักไม่ถูกต้อง'])->withInput();
+        }
+
+        // อัปเดตรหัสผ่านใหม่
+        $staff->password = Hash::make($request->password);
+        $staff->save();
+
+        // ลบ token รีเซ็ตที่ค้างอยู่ถ้ามี
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        return redirect()->route('login')->with('success', 'รีเซ็ตรหัสผ่านสำเร็จ! กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่');
     }
 
     /**
@@ -144,7 +201,7 @@ class AuthController extends Controller
             'staff_email' => $request->email,
             'staff_pincode' => (string) rand(1000, 9999), // กำหนด Pincode เริ่มต้นแบบสุ่มไปก่อน (เพราะในฟอร์มไม่มีให้กรอก)
             'password' => Hash::make($request->password),
-            'role_id' => 2,
+            'role_id' => Staff::ROLE_EMPLOYEE,
         ]);
 
         return redirect()->route('login')
@@ -154,14 +211,26 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'username' => 'required', // can be email or username
+            'username' => 'required', // can be email, staff_id (e.g. BUU-010 or 10), or username
             'password' => 'required'
         ]);
 
-        // ตรวจสอบว่าสิ่งที่กรอกมาคืออีเมล หรือ ชื่อผู้ใช้งาน
-        $fieldType = filter_var($request->username, FILTER_VALIDATE_EMAIL) ? 'staff_email' : 'staff_name';
+        $username = trim($request->username);
+        $fieldType = 'staff_name';
+        $loginValue = $username;
 
-        if (\Illuminate\Support\Facades\Auth::attempt([$fieldType => $request->username, 'password' => $request->password])) {
+        // ตรวจสอบว่าเป็นอีเมล, รหัสพนักงาน (ตัวเลข หรือ BUU-xxx), หรือชื่อผู้ใช้งาน
+        if (filter_var($username, FILTER_VALIDATE_EMAIL)) {
+            $fieldType = 'staff_email';
+        } elseif (is_numeric($username)) {
+            $fieldType = 'staff_id';
+            $loginValue = (int) $username;
+        } elseif (preg_match('/^buu\-([0-9]+)$/i', $username, $matches)) {
+            $fieldType = 'staff_id';
+            $loginValue = (int) $matches[1];
+        }
+
+        if (\Illuminate\Support\Facades\Auth::attempt([$fieldType => $loginValue, 'password' => $request->password])) {
             $request->session()->regenerate();
             return redirect()->intended('dashboard');
         }

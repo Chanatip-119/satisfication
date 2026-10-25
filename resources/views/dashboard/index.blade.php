@@ -10,8 +10,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-
-    <!-- Sidebar พร้อมปุ่ม Logout ด้านล่างสุด -->
     <div class="sidebar">
         <div class="sidebar-logo">
             <img src="{{ asset('images/Buu-logo11.png') }}" alt="Logo">
@@ -27,41 +25,37 @@
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
+        
         <div class="user-profile-container">
-            <!-- เมนู Dropdown (ซ่อนไว้เริ่มต้น) -->
             <div class="profile-dropdown-menu" id="profileDropdown">
                 <a href="#" class="dropdown-item text-danger" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     ออกจากระบบ
                 </a>
             </div>
-            
-            <!-- ปุ่มกดดูโปรไฟล์ -->
-        <div class="user-profile-toggle" onclick="toggleProfileDropdown()">
-            <div class="avatar">
-                <!-- ดึงตัวอักษรตัวแรกมาแสดง (เช็คเผื่อชื่อฟิลด์ต่างๆ และป้องกันค่าว่าง) -->
-                @php
-                    $displayName = 'User';
-                    if(Auth::check()) {
-                        $user = Auth::user();
-                        $displayName = $user->name ?? $user->staff_name ?? $user->first_name ?? $user->username ?? 'User';
-                    }
-                @endphp
-                {{ mb_strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'), 'UTF-8') }}
+            <div class="user-profile-toggle" onclick="toggleProfileDropdown()">
+                <div class="avatar">
+                    @php
+                        $displayName = 'User';
+                        if(Auth::check()) {
+                            $user = Auth::user();
+                            $displayName = $user->name ?? $user->staff_name ?? $user->first_name ?? $user->username ?? 'User';
+                        }
+                    @endphp
+                    {{ mb_strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'), 'UTF-8') }}
+                </div>
+                
+                <div class="user-info">
+                    <div class="user-name">{{ $displayName }}</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
             </div>
             
-            <div class="user-info">
-                <!-- แสดงชื่อเต็ม -->
-                <div class="user-name">{{ $displayName }}</div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                @csrf
+            </form>
         </div>
-        
-        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
-            @csrf
-        </form>
     </div>
-</div>
 
     <!-- Main Content -->
     <div class="content">
@@ -96,7 +90,7 @@
                 <div class="kpi-value">{{ number_format($avgScore, 1) }}</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label"><i class="far fa-check-square"></i> การประเมิน{{ $period == 'today' ? 'วันนี้' : '' }}</div>
+                <div class="kpi-label"><i class="far fa-check-square"></i> การประเมิน</div>
                 <div class="kpi-value">{{ number_format($totalEvalCount) }}</div>
             </div>
             <div class="kpi-card">
@@ -115,7 +109,15 @@
             <div class="left-col">
                 <div class="panel-card">
                     <div class="panel-header">
-                        <div class="panel-title">แนวโน้มคะแนนรายวัน 7 วันล่าสุด</div>
+                        <div class="panel-title">
+                            @if($period == 'month')
+                                แนวโน้มคะแนนของเดือนนี้
+                            @elseif($period == 'all')
+                                แนวโน้มคะแนนทั้งหมด
+                            @else
+                                แนวโน้มคะแนนรายวัน 7 วันล่าสุด
+                            @endif
+                        </div>
                         <div class="panel-subtitle">เฉลี่ยทุกเคาน์เตอร์</div>
                     </div>
                     <div style="height: 210px; position: relative;">
@@ -190,7 +192,17 @@
                 <div class="panel-card">
                     <div class="panel-header">
                         <div class="panel-title">การกระจายคะแนน</div>
-                        <div class="panel-subtitle">{{ $period == 'today' ? 'วันนี้' : 'ตามช่วงที่เลือก' }}</div>
+                        <div class="panel-subtitle">
+                            @if($period == 'today')
+                                วันนี้
+                            @elseif($period == 'week')
+                                7 วันล่าสุด
+                            @elseif($period == 'month')
+                                เดือนนี้
+                            @else
+                                ทั้งหมด
+                            @endif
+                        </div>
                     </div>
 
                     <?php
@@ -231,9 +243,8 @@
                     <div class="panel-header" style="margin-bottom: 8px;">
                         <div class="panel-title">คะแนนสูง & ต้องปรับปรุง</div>
                     </div>
-
+                    
                     <div class="perf-group">
-                    <!-- ใช้ if-else ของ Laravel Blade เช็คค่า $period เพื่อแสดงข้อความที่ถูกต้อง -->
                         <div class="perf-tag">
                             @if($period == 'week')
                                 สูงสุดสัปดาห์นี้
@@ -244,19 +255,18 @@
                             @else
                                 สูงสุดวันนี้
                             @endif
-                    </div>
-
-                    <?php if($highestStaff): ?>
-                    <div class="perf-row">
-                        <div>
-                            <div style="font-weight: 700; font-size: 14px; color: #1a202c;">{{ $highestStaff['name'] }}</div>
-                            <div style="font-size: 12px; color: #718096; margin-top: 2px;">เคาน์เตอร์ {{ $highestStaff['counter_code'] }}</div>
                         </div>
-                        <span class="score-badge-lg score-high">{{ number_format($highestStaff['avg_score'], 1) }}</span>
-                    </div>
-                    <?php else: ?>
-                        <div style="font-size: 12px; color: #a0aec0;">ยังไม่มีข้อมูลคะแนนประเมิน</div>
-                    <?php endif; ?>
+                        <?php if($highestStaff): ?>
+                            <div class="perf-row">
+                                <div>
+                                    <div style="font-weight: 700; font-size: 14px; color: #1a202c;">{{ $highestStaff['name'] }}</div>
+                                    <div style="font-size: 12px; color: #718096; margin-top: 2px;">เคาน์เตอร์ {{ $highestStaff['counter_code'] }}</div>
+                                </div>
+                                <span class="score-badge-lg score-high">{{ number_format($highestStaff['avg_score'], 1) }}</span>
+                            </div>
+                        <?php else: ?>
+                            <div style="font-size: 12px; color: #a0aec0;">ยังไม่มีข้อมูลคะแนนประเมิน</div>
+                        <?php endif; ?>
                     </div>
 
                     <div class="perf-group" style="padding-top: 14px;">
@@ -282,7 +292,17 @@
             <div class="panel-card">
                 <div class="panel-header">
                     <div class="panel-title">คะแนนเฉลี่ยรายเคาน์เตอร์</div>
-                    <div class="panel-subtitle">{{ $period == 'today' ? 'วันนี้' : 'ตามช่วงที่เลือก' }}</div>
+                    <div class="panel-subtitle">
+                        @if($period == 'today')
+                            วันนี้
+                        @elseif($period == 'week')
+                            7 วันล่าสุด
+                        @elseif($period == 'month')
+                            เดือนนี้
+                        @else
+                            ทั้งหมด
+                        @endif
+                    </div>
                 </div>
                 <?php foreach($counterAvgScores as $cItem): ?>
                     <?php $barW = min(max(($cItem['score'] / 5) * 100, 0), 100); ?>
@@ -299,7 +319,18 @@
             <div class="panel-card">
                 <div class="panel-header">
                     <div class="panel-title">ความคิดเห็นล่าสุด</div>
-                    <div class="panel-subtitle">{{ $newCommentsCount }} รายการ{{ $period == 'today' ? 'วันนี้' : '' }}</div>
+                    <div class="panel-subtitle">
+                        {{ $newCommentsCount }} รายการ 
+                        @if($period == 'today')
+                            วันนี้
+                        @elseif($period == 'week')
+                            7 วันล่าสุด
+                        @elseif($period == 'month')
+                            เดือนนี้
+                        @else
+                            ทั้งหมด
+                        @endif
+                    </div>
                 </div>
 
                 <?php if(count($recentComments) > 0): ?>
@@ -387,21 +418,20 @@
     </script>
 
     <script>
-    function toggleProfileDropdown() {
-        const dropdown = document.getElementById('profileDropdown');
-        const container = document.querySelector('.user-profile-container');
-        dropdown.classList.toggle('show');
-        container.classList.toggle('open');
-    }
-    
-    // คลิกพื้นที่อื่นบนหน้าจอเพื่อปิด Dropdown อัตโนมัติ
-    window.addEventListener('click', function(e) {
-        const container = document.querySelector('.user-profile-container');
-        if (container && !container.contains(e.target)) {
-            document.getElementById('profileDropdown').classList.remove('show');
-            container.classList.remove('open');
+        function toggleProfileDropdown() {
+            const dropdown = document.getElementById('profileDropdown');
+            const container = document.querySelector('.user-profile-container');
+            dropdown.classList.toggle('show');
+            container.classList.toggle('open');
         }
-    });
-</script>
+        
+        window.addEventListener('click', function(e) {
+            const container = document.querySelector('.user-profile-container');
+            if (container && !container.contains(e.target)) {
+                document.getElementById('profileDropdown').classList.remove('show');
+                container.classList.remove('open');
+            }
+        });
+    </script>
 </body>
 </html>

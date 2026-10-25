@@ -75,12 +75,7 @@
                 @php
                     $isActive = $sub->is_active;
                     $locationText = $sub->counter ? $sub->counter->counter_location : '';
-                    $timeText = "";
-                    if(isset($schedules[$sub->counter_sub_id]) && $schedules[$sub->counter_sub_id]->isNotEmpty()) {
-                        $sch = $schedules[$sub->counter_sub_id]->first();
-                        $timeText = substr($sch->start_time, 0, 5) . '-' . substr($sch->end_time, 0, 5);
-                    }
-                    $displaySubtitle = $timeText ? $locationText . " — " . $timeText : $locationText;
+                    $displaySubtitle = $locationText;
                     
                     $evaluationUrl = route('evaluation.create', ['counter_sub_id' => $sub->counter_sub_id]);
                     $qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($evaluationUrl) . "&margin=15";

@@ -34,20 +34,20 @@
 
         @if(session('success'))
             <div class="alert-success">
-                ✅ {{ session('success') }}
+                {{ session('success') }}
             </div>
         @endif
 
         @if(session('status'))
             <div class="alert-info">
-                ℹ️ {{ session('status') }}
+                {{ session('status') }}
             </div>
         @endif
 
         @if($errors->any())
             <div class="alert-danger">
                 @foreach ($errors->all() as $error)
-                    <div>⚠️ {{ $error }}</div>
+                    <div>{{ $error }}</div>
                 @endforeach
             </div>
         @endif

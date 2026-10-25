@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>รายงาน Staff</title>
     <link rel="stylesheet" href="{{ asset('css/staff.css') }}?v={{ filemtime(public_path('css/staff.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/report.css') }}?v={{ filemtime(public_path('css/report.css')) }}">
 </head>
 <body>
+@php
+    $isEmployee = auth()->check() && auth()->user()->isEmployee();
+@endphp
 
     <aside class="sidebar">
         <div class="sidebar-logo">
@@ -38,33 +42,31 @@
             </div>
             
             <!-- ปุ่มกดดูโปรไฟล์ -->
-        <div class="user-profile-toggle" onclick="toggleProfileDropdown()">
-            <div class="avatar">
-                <!-- ดึงตัวอักษรตัวแรกมาแสดง (เช็คเผื่อชื่อฟิลด์ต่างๆ และป้องกันค่าว่าง) -->
-                @php
-                    $displayName = 'User';
-                    if(Auth::check()) {
-                        $user = Auth::user();
-                        $displayName = $user->name ?? $user->staff_name ?? $user->first_name ?? $user->username ?? 'User';
-                    }
-                @endphp
-                {{ mb_strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'), 'UTF-8') }}
+            <div class="user-profile-toggle" onclick="toggleProfileDropdown()">
+                <div class="avatar">
+                    @php
+                        $displayName = 'User';
+                        if(Auth::check()) {
+                            $user = Auth::user();
+                            $displayName = $user->name ?? $user->staff_name ?? $user->first_name ?? $user->username ?? 'User';
+                        }
+                    @endphp
+                    {{ mb_strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'), 'UTF-8') }}
+                </div>
+                
+                <div class="user-info">
+                    <div class="user-name">{{ $displayName }}</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
             </div>
-            
-            <div class="user-info">
-                <!-- แสดงชื่อเต็ม -->
-                <div class="user-name">{{ $displayName }}</div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
-        </div>
 
-        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
-            @csrf
-        </form>
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                @csrf
+            </form>
+        </div>
     </aside>
 
     <main class="content">
-        
         <div class="page-header-flex">
             <div class="page-title">
                 <h1 style="font-size: 20px; color: #1a202c;">รายงาน Staff</h1>
@@ -102,21 +104,36 @@
                         <td>{{ number_format($s->checkin_count) }}</td>
                         <td>{{ number_format($s->comment_count) }}</td>
                         <td>
-                            <div class="status-badge {{ strtolower($s->status) }}">
-                                <div class="dot"></div> {{ $s->status }}
+                            @php
+                                $statusText = $s->status ?? 'Offline';
+                                // แปลงคำสถานะให้แสดงผลเป็น Active หรือ Offline
+                                $isActive = (strtolower($statusText) === 'active' || strtolower($statusText) === 'checkin');
+                                $displayStatus = $isActive ? 'Active' : 'Offline';
+                            @endphp
+                            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500; {{ $isActive ? 'background: #f0fff4; color: #276749;' : 'background: #edf2f7; color: #4a5568;' }}">
+                                <div style="width: 7px; height: 7px; border-radius: 50%; {{ $isActive ? 'background: #48bb78;' : 'background: #a0aec0;' }}"></div> 
+                                {{ $displayStatus }}
                             </div>
                         </td>
                         <td>
-                            <button class="btn-outline" onclick="openStaffPanel({{ $s->staff_id }})">ดูรายงาน</button>
+                            @if($isEmployee)
+                                @if((int) $s->staff_id === (int) auth()->user()->staff_id)
+                                    <button type="button" class="btn-outline" onclick="openStaffPanel({{ $s->staff_id }})">ดูรายงาน</button>
+                                @else
+                                    <span style="color: #a0aec0; font-size: 13px;">-</span>
+                                @endif
+                            @else
+                                <button type="button" class="btn-outline" onclick="openStaffPanel({{ $s->staff_id }})">ดูรายงาน</button>
+                            @endif
                         </td>
                     </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
-
     </main>
 
+    <!-- Side Panel -->
     <div id="staff-panel-overlay" class="side-panel-overlay" onclick="closeStaffPanel()"></div>
     <div id="staff-panel" class="side-panel">
         <div class="sp-header">
@@ -153,9 +170,18 @@
                 </div>
 
                 <div class="sp-info-list">
+                    <div class="sp-info-item sp-info-item-long">
+                        <span class="sp-info-label">ฝ่าย</span>
+                        <span class="sp-info-val" id="sp-department">-</span>
+                    </div>
+                    <div class="sp-info-item sp-info-item-long">
+                        <span class="sp-info-label">ตำแหน่ง</span>
+                        <span class="sp-info-val" id="sp-position">-</span>
+                    </div>
                     <div class="sp-info-item">
                         <span class="sp-info-label">สถานะปัจจุบัน</span>
                         <span class="status active" style="padding: 2px 10px; font-size: 12px;" id="sp-status"><div class="status-dot"></div> Active</span>
+                        </span>
                     </div>
                     <div class="sp-info-item">
                         <span class="sp-info-label">เคาน์เตอร์ปัจจุบัน</span>
@@ -165,21 +191,25 @@
                         <span class="sp-info-label">ช่วงเวลาวันนี้</span>
                         <span class="sp-info-val" id="sp-time-range">-</span>
                     </div>
+                    @unless($isEmployee)
                     <div class="sp-info-item">
                         <span class="sp-info-label">PIN Code</span>
                         <span class="sp-info-val" id="sp-pin">-</span>
                     </div>
+                    @endunless
                 </div>
 
                 <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">สัดส่วนคะแนนที่ได้รับ</h4>
                 <div id="sp-progress-container"></div>
                 
+                @unless($isEmployee)
                 <h4 style="font-size: 13px; color: #718096; margin: 25px 0 15px;">การดำเนินการ</h4>
                 <div style="display:flex; flex-direction: column; gap: 10px;">
                     <button class="action-btn" style="width: 100%; justify-content: center; height: 38px;">ส่ง PIN ซ้ำ (Gmail)</button>
                     <button class="action-btn" style="width: 100%; justify-content: center; height: 38px;">Reset PIN Code</button>
                     <button class="action-btn" style="width: 100%; justify-content: center; height: 38px;">Export รายงาน</button>
                 </div>
+                @endunless
             </div>
 
             <div id="sp-tab-history" class="sp-section">
@@ -204,16 +234,24 @@
             document.querySelectorAll('.sp-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.sp-section').forEach(s => s.classList.remove('active'));
             
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
             document.getElementById('sp-tab-' + tabName).classList.add('active');
         }
 
         function openStaffPanel(staffId) {
+            @if($isEmployee)
+                staffId = {{ auth()->user()->staff_id }};
+            @endif
+
             document.getElementById('staff-panel-overlay').classList.add('show');
             document.getElementById('staff-panel').classList.add('open');
             
             document.getElementById('sp-name').innerText = "กำลังโหลดข้อมูล...";
             document.getElementById('sp-code').innerText = "BUU-...";
+            document.getElementById('sp-department').innerText = "-";
+            document.getElementById('sp-position').innerText = "-";
             document.getElementById('sp-avg-rating').innerText = "-";
             document.getElementById('sp-total-checkins').innerText = "-";
             document.getElementById('sp-total-comments').innerText = "-";
@@ -227,16 +265,31 @@
             .then(data => {
                 document.getElementById('sp-name').innerText = data.name;
                 document.getElementById('sp-code').innerText = data.code;
-                document.getElementById('sp-pin').innerText = data.pin || '-';
+                document.getElementById('sp-department').innerText = data.department || '-';
+                document.getElementById('sp-position').innerText = data.position || '-';
+                const pinEl = document.getElementById('sp-pin');
+                if (pinEl) pinEl.innerText = data.pin || '-';
                 document.getElementById('sp-avg-rating').innerText = data.avg_rating;
                 document.getElementById('sp-total-checkins').innerText = data.total_checkins;
                 document.getElementById('sp-total-comments').innerText = data.total_comments;
                 document.getElementById('sp-current-counter').innerText = data.current_counter;
                 document.getElementById('sp-time-range').innerText = data.time_range;
                 
-                let statusHtml = '<div class="status-dot"></div> ' + data.status;
-                document.getElementById('sp-status').innerHTML = statusHtml;
-                document.getElementById('sp-status').className = data.status === 'Active' ? 'status active' : 'status offline';
+                // อัปเดตสถานะใน Side Panel ให้เป็น Active / Offline แบบมีกรอบแคปซูล
+                const rawStatus = (data.status || 'Offline').toLowerCase();
+                const isActive = (rawStatus === 'active' || rawStatus === 'checkin');
+                const displayStatus = isActive ? 'Active' : 'Offline';
+
+                const statusContainer = document.getElementById('sp-status');
+                const statusDot = document.getElementById('sp-status-dot');
+                const statusText = document.getElementById('sp-status-text');
+
+                if (statusContainer && statusDot && statusText) {
+                    statusText.innerText = displayStatus;
+                    statusContainer.style.background = isActive ? '#f0fff4' : '#edf2f7';
+                    statusContainer.style.color = isActive ? '#276749' : '#4a5568';
+                    statusDot.style.background = isActive ? '#48bb78' : '#a0aec0';
+                }
 
                 let progHtml = '';
                 for(let i=5; i>=1; i--) {
@@ -295,21 +348,20 @@
     </script>
 
     <script>
-    function toggleProfileDropdown() {
-        const dropdown = document.getElementById('profileDropdown');
-        const container = document.querySelector('.user-profile-container');
-        dropdown.classList.toggle('show');
-        container.classList.toggle('open');
-    }
-    
-    // คลิกพื้นที่อื่นบนหน้าจอเพื่อปิด Dropdown อัตโนมัติ
-    window.addEventListener('click', function(e) {
-        const container = document.querySelector('.user-profile-container');
-        if (container && !container.contains(e.target)) {
-            document.getElementById('profileDropdown').classList.remove('show');
-            container.classList.remove('open');
+        function toggleProfileDropdown() {
+            const dropdown = document.getElementById('profileDropdown');
+            const container = document.querySelector('.user-profile-container');
+            dropdown.classList.toggle('show');
+            container.classList.toggle('open');
         }
-    });
-</script>
+        
+        window.addEventListener('click', function(e) {
+            const container = document.querySelector('.user-profile-container');
+            if (container && !container.contains(e.target)) {
+                document.getElementById('profileDropdown').classList.remove('show');
+                container.classList.remove('open');
+            }
+        });
+    </script>
 </body>
 </html>

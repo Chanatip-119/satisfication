@@ -34,20 +34,20 @@
 
         @if(session('success'))
             <div class="alert-success">
-                ✅ {{ session('success') }}
+                {{ session('success') }}
             </div>
         @endif
 
         @if(session('status'))
             <div class="alert-info">
-                ℹ️ {{ session('status') }}
+                {{ session('status') }}
             </div>
         @endif
 
         @if($errors->any())
             <div class="alert-danger">
                 @foreach ($errors->all() as $error)
-                    <div>⚠️ {{ $error }}</div>
+                    <div>{{ $error }}</div>
                 @endforeach
             </div>
         @endif
@@ -55,14 +55,14 @@
         <form action="{{ route('login.submit') }}" method="POST">
             @csrf
             <div class="form-group">
-                <label>ชื่อผู้ใช้งาน (Username)</label>
+                <label>ชื่อผู้ใช้งาน (Email / รหัสพนักงาน / ชื่อผู้ใช้งาน)</label>
                 <div class="input-group">
                     <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
-                    <input type="text" name="username" placeholder="กรอกชื่อผู้ใช้งาน" required>
+                    <input type="text" name="username" placeholder="กรอกอีเมล, รหัสพนักงาน (เช่น BUU-010 หรือ 10) หรือชื่อ" required>
                 </div>
             </div>
 

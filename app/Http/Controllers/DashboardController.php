@@ -194,16 +194,55 @@ class DashboardController extends Controller
 
         $trendLabels = [];
         $trendScores = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $d = $nowBkk->copy()->subDays($i);
-            $dStr = $d->format('Y-m-d');
 
-            $trendLabels[] = $i === 0
-                ? $d->translatedFormat('j M') . ' (วันนี้)'
-                : $d->translatedFormat('j M');
+        if ($period == 'month') {
+            // 1. กรณีเลือก "เดือนนี้": วนลูปตั้งแต่วันที่ 1 จนถึงวันปัจจุบันของเดือนนี้
+            $startOfMonth = $nowBkk->copy()->startOfMonth();
+            $daysInMonthCount = $nowBkk->day; // นับจากวันที่ 1 ถึงวันปัจจุบัน หรือใช้ $nowBkk->daysInMonth ถ้ารวมทั้งเดือน
 
-            $dayEvals = $normalizedEvals->where('date_str', $dStr);
-            $trendScores[] = $dayEvals->count() > 0 ? round($dayEvals->avg('score'), 2) : 0;
+            for ($i = $daysInMonthCount - 1; $i >= 0; $i--) {
+                $d = $nowBkk->copy()->subDays($i);
+                $dStr = $d->format('Y-m-d');
+
+                $trendLabels[] = $d->isToday()
+                    ? $d->translatedFormat('j M') . ' (วันนี้)'
+                    : $d->translatedFormat('j M');
+
+                $dayEvals = $normalizedEvals->where('date_str', $dStr);
+                $trendScores[] = $dayEvals->count() > 0 ? round($dayEvals->avg('score'), 2) : 0;
+            }
+        } elseif ($period == 'all') {
+            // 2. กรณีเลือก "ทั้งหมด": ดึงวันที่ทั้งหมดที่มีการประเมินจริงในระบบมาเรียงลำดับ
+            $allDates = $normalizedEvals->pluck('date_str')->unique()->sort()->values();
+
+            if ($allDates->isEmpty()) {
+                // ถ้ายังไม่มีข้อมูลเลย ให้แสดงของวันนี้กันกราฟพัง
+                $trendLabels[] = $nowBkk->translatedFormat('j M') . ' (วันนี้)';
+                $trendScores[] = 0;
+            } else {
+                foreach ($allDates as $dStr) {
+                    $d = \Carbon\Carbon::parse($dStr);
+                    $trendLabels[] = $d->isToday()
+                        ? $d->translatedFormat('j M') . ' (วันนี้)'
+                        : $d->translatedFormat('j M');
+
+                    $dayEvals = $normalizedEvals->where('date_str', $dStr);
+                    $trendScores[] = $dayEvals->count() > 0 ? round($dayEvals->avg('score'), 2) : 0;
+                }
+            }
+        } else {
+            // 3. กรณี "วันนี้" หรือ "7 วันล่าสุด" (ค่าเริ่มต้นเดิมของคุณ)
+            for ($i = 6; $i >= 0; $i--) {
+                $d = $nowBkk->copy()->subDays($i);
+                $dStr = $d->format('Y-m-d');
+
+                $trendLabels[] = $d->isToday()
+                    ? $d->translatedFormat('j M') . ' (วันนี้)'
+                    : $d->translatedFormat('j M');
+
+                $dayEvals = $normalizedEvals->where('date_str', $dStr);
+                $trendScores[] = $dayEvals->count() > 0 ? round($dayEvals->avg('score'), 2) : 0;
+            }
         }
 
         $starCounts = [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0];
