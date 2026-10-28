@@ -10,6 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+@php
+    $isEmployee = auth()->check() && auth()->user()->isEmployee();
+@endphp
     <div class="sidebar">
         <div class="sidebar-logo">
             <img src="{{ asset('images/Buu-logo11.png') }}" alt="Logo">
@@ -238,12 +241,12 @@
                         <?php endif; ?>
                     </div>
                 </div>
-
+                
+                @unless($isEmployee)
                 <div class="panel-card">
                     <div class="panel-header" style="margin-bottom: 8px;">
                         <div class="panel-title">คะแนนสูง & ต้องปรับปรุง</div>
                     </div>
-                    
                     <div class="perf-group">
                         <div class="perf-tag">
                             @if($period == 'week')
@@ -268,7 +271,6 @@
                             <div style="font-size: 12px; color: #a0aec0;">ยังไม่มีข้อมูลคะแนนประเมิน</div>
                         <?php endif; ?>
                     </div>
-
                     <div class="perf-group" style="padding-top: 14px;">
                         <div class="perf-tag">ต้องปรับปรุง</div>
                         <?php if($lowestStaff): ?>
@@ -284,9 +286,10 @@
                         <?php endif; ?>
                     </div>
                 </div>
+                @endunless
             </div>
         </div>
-
+  
         <!-- Bottom Grid -->
         <div class="dashboard-bottom-grid">
             <div class="panel-card">
@@ -315,7 +318,8 @@
                     </div>
                 <?php endforeach; ?>
             </div>
-
+            
+            @unless($isEmployee)
             <div class="panel-card">
                 <div class="panel-header">
                     <div class="panel-title">ความคิดเห็นล่าสุด</div>
@@ -354,6 +358,7 @@
                     </div>
                 <?php endif; ?>
             </div>
+            @endunless
         </div>
     </div>
 

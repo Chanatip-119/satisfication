@@ -67,7 +67,7 @@
     <div class="content">
         <div class="qr-header">
             <h1>QR Code เคาน์เตอร์</h1>
-            <p>สร้างและดาวน์โหลด QR Code สำหรับแต่ละเคาน์เตอร์</p>
+            <p>สร้างและดาวน์โหลด QR Code สำหรับแต่ละเคาน์เตอร์ พร้อมลิงก์ URL สำหรับประเมิน</p>
         </div>
 
         <div class="qr-grid">
@@ -79,6 +79,7 @@
                     
                     $evaluationUrl = route('evaluation.create', ['counter_sub_id' => $sub->counter_sub_id]);
                     $qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($evaluationUrl) . "&margin=15";
+                    $inputId = 'url-input-' . str_replace('.', '_', $sub->counter_sub_id);
                 @endphp
 
                 @if($isActive)
@@ -88,9 +89,22 @@
                         </div>
                         <div class="qr-title">เคาน์เตอร์ {{ $sub->counter_sub_id }}</div>
                         <div class="qr-subtitle">{{ $displaySubtitle }}</div>
+                        
+                        <!-- ปุ่มดาวน์โหลด PNG -->
                         <button onclick="downloadQR('qr-img-{{ str_replace('.', '_', $sub->counter_sub_id) }}', 'เคาน์เตอร์_{{ $sub->counter_sub_id }}')" class="btn-download">
                             <i class="fas fa-download"></i> ดาวน์โหลด PNG
                         </button>
+
+                        <!-- ส่วน URL และปุ่มคัดลอก URL -->
+                        <div style="margin-top: 12px; width: 100%; text-align: left;">
+                            <label style="font-size: 11px; color: #718096; display: block; margin-bottom: 4px; font-weight: 500;">ลิงก์ URL สำหรับประเมิน:</label>
+                            <div style="display: flex; gap: 6px;">
+                                <input type="text" id="{{ $inputId }}" value="{{ $evaluationUrl }}" readonly style="flex: 1; font-size: 11px; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; color: #4a5568; outline: none;">
+                                <button onclick="copyUrl('{{ $inputId }}', event)" title="คัดลอกลิงก์" style="padding: 6px 10px; background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; color: #4a5568; transition: all 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#edf2f7'">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 @else
                     <div class="qr-card disabled">
@@ -110,6 +124,13 @@
         </div>
     </div>
 
+    <!-- กล่องข้อความแจ้งเตือน (Toast Notification) อยู่ด้านบนตรงกลาง -->
+    <div id="copy-toast">
+        <i class="fas fa-check-circle" style="font-size: 18px;"></i>
+        <span>คัดลอกลิงก์ลงคลิปบอร์ดเรียบร้อยแล้ว</span>
+    </div>
+
+    <!-- JavaScript สำหรับดาวน์โหลด และ คัดลอกลิงก์ -->
     <script>
         function downloadQR(imgId, filename) {
             const img = document.getElementById(imgId);
@@ -135,6 +156,43 @@
                     a.target = '_blank';
                     a.click();
                 });
+        }
+
+        function copyUrl(inputId, event) {
+            const inputElement = document.getElementById(inputId);
+            if (!inputElement) return;
+
+            inputElement.select();
+            inputElement.setSelectionRange(0, 99999);
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    const btn = event.currentTarget;
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check" style="color: #48bb78;"></i>';
+                    setTimeout(() => {
+                        btn.innerHTML = originalHTML;
+                    }, 1500);
+
+                    showToast();
+                } else {
+                    alert('ไม่สามารถคัดลอกลิงก์ได้');
+                }
+            } catch (err) {
+                alert('เบราว์เซอร์ไม่รองรับการคัดลอกอัตโนมัติ');
+            }
+        }
+
+        let toastTimer;
+        function showToast() {
+            const toast = document.getElementById('copy-toast');
+            toast.classList.add('show');
+            
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
         }
 
         function toggleProfileDropdown() {
