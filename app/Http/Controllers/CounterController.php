@@ -15,9 +15,11 @@ class CounterController extends Controller
 {
     public function index()
     {
-        $counters = Counter::with(['countersubs.schedules' => function ($query) {
-            $query->orderBy('schedule_date', 'desc');
-        }])->get();
+        // [แก้ไข ระดับ 2 ข้อ 8] โหลดเฉพาะจุดย่อย ไม่ต้องโหลดกะทั้งหมดแล้ว
+        // เดิม: Counter::with(['countersubs.schedules' => fn ($q) => $q->orderBy('schedule_date', 'desc')])->get();
+        // เหตุผล: หน้าเคาน์เตอร์ไม่ได้ใช้เวลาจากกะอีกต่อไป (ดู store/update) และการโหลดกะทุกแถวตั้งแต่เริ่มใช้ระบบ
+        //        ทำให้หน้านี้ช้าลงเรื่อย ๆ และฝังข้อมูลกะทั้งหมดลงในปุ่มแก้ไขของทุกแถว
+        $counters = Counter::with('countersubs')->get();
         
         return view('counter.index', compact('counters'));
     }
@@ -37,31 +39,23 @@ class CounterController extends Controller
 
         DB::transaction(function () use ($validated, $request) {
             $counter = Counter::create($validated);
-            // จัดการสร้าง Sub-Counter แบบรวดเดียวตอนสร้างเคาน์เตอร์หลัก
-            if ($request->has('new_start_time')) {
-                foreach ($request->new_start_time as $index => $startTime) {
-                    $endTime = $request->new_end_time[$index] ?? '16:00';
-                    $isActive = $request->new_is_active[$index] ?? 1;
 
-                    $newSub = $counter->countersubs()->create([
-                        'is_active' => $isActive
+            // ===== [แก้ไข ระดับ 2 ข้อ 8] สร้างจุดย่อยโดยไม่สร้างแถวในตาราง schedule =====
+            // เดิม: วนตาม new_start_time[] แล้วเรียก Schedule::updateOrCreate(['counter_sub_id', 'schedule_date' => วันนี้], [เวลา])
+            // ปัญหา: 1) สร้างแถว "กะที่ไม่มีคน" ลงในตาราง schedule ปนกับกะของบุคลากร
+            //        2) ถ้าวันนี้จุดนั้นมีกะของบุคลากรอยู่แล้ว จะไปแก้เวลากะของคนนั้นแทน
+            // ใหม่: วนตาม new_is_active[] และสร้างแค่ counter_sub
+            if ($request->has('new_is_active')) {
+                foreach ($request->new_is_active as $isActive) {
+                    $counter->countersubs()->create([
+                        'is_active' => $isActive ?? 1
                     ]);
-
-                    Schedule::updateOrCreate(
-                        [
-                            'counter_sub_id' => $newSub->counter_sub_id,
-                            'schedule_date' => now()->toDateString(), 
-                        ],
-                        [
-                            'start_time' => $startTime,
-                            'end_time' => $endTime,
-                        ]
-                    );
                 }
             }
+            // ===== [จบ ข้อ 8: store] =====
         });
 
-        return redirect()->route('counter.index')->with('success', 'เพิ่มข้อมูลเคาน์เตอร์และช่วงเวลาสำเร็จ');
+        return redirect()->route('counter.index')->with('success', 'เพิ่มข้อมูลเคาน์เตอร์สำเร็จ');
     }
 
     public function update(Request $request, $id)
@@ -76,53 +70,31 @@ class CounterController extends Controller
         DB::transaction(function () use ($counter, $validated, $request) {
             $counter->update($validated);
 
-            // จัดการเพิ่ม Sub-Counter ตัวใหม่ที่ถูกกดเพิ่มเข้ามาตอนแก้ไข
-            if ($request->has('new_start_time')) {
-                foreach ($request->new_start_time as $index => $startTime) {
-                    $endTime = $request->new_end_time[$index] ?? '16:00';
-                    $isActive = $request->new_is_active[$index] ?? 1;
-
-                    $newSub = $counter->countersubs()->create([
-                        'is_active' => $isActive
+            // ===== [แก้ไข ระดับ 2 ข้อ 8] เพิ่มจุดย่อยใหม่โดยไม่แตะตาราง schedule =====
+            // เดิม: วนตาม new_start_time[] แล้วเรียก Schedule::updateOrCreate(...) เหมือนใน store()
+            if ($request->has('new_is_active')) {
+                foreach ($request->new_is_active as $isActive) {
+                    $counter->countersubs()->create([
+                        'is_active' => $isActive ?? 1
                     ]);
-
-                    Schedule::updateOrCreate(
-                        [
-                            'counter_sub_id' => $newSub->counter_sub_id,
-                            'schedule_date' => now()->toDateString(), 
-                        ],
-                        [
-                            'start_time' => $startTime,
-                            'end_time' => $endTime,
-                        ]
-                    );
                 }
             }
+            // ===== [จบ ข้อ 8: เพิ่มจุดย่อย] =====
 
-            // จัดการอัปเดตข้อมูล Sub-Counter เดิมที่มีอยู่แล้ว
+            // ===== [แก้ไข ระดับ 2 ข้อ 8] อัปเดตเฉพาะสถานะของจุดย่อยเดิม =====
+            // เดิม: นอกจากอัปเดต is_active แล้ว ยังเรียก Schedule::updateOrCreate(['counter_sub_id', 'schedule_date' => วันนี้], [เวลาจากช่องที่ซ่อนไว้])
+            // ปัญหา: แค่กดบันทึกหน้าเคาน์เตอร์ (แม้แก้แค่ชื่อตำแหน่ง) ก็ไปเปลี่ยนเวลากะของบุคลากรที่ทำงานวันนี้ได้
+            //        โดยผู้ใช้มองไม่เห็นช่องเวลาเลย
             if ($request->has('existing_sub_id')) {
                 foreach ($request->existing_sub_id as $index => $subId) {
-                    $startTime = $request->existing_start_time[$index] ?? '08:00';
-                    $endTime = $request->existing_end_time[$index] ?? '16:00';
-
                     if (isset($request->existing_is_active[$index])) {
                         $counter->countersubs()->where('counter_sub_id', $subId)->update([
                             'is_active' => $request->existing_is_active[$index]
                         ]);
                     }
-
-                    Schedule::updateOrCreate(
-                        [
-                            'counter_sub_id' => $subId,
-                            'schedule_date' => now()->toDateString(), 
-                        ],
-                        [
-                            'start_time' => $startTime,
-                            'end_time' => $endTime,
-                        ]
-                    );
                 }
             }
+            // ===== [จบ ข้อ 8: อัปเดตจุดย่อยเดิม] =====
         });
 
         return redirect()->route('counter.index')->with('success', 'อัปเดตข้อมูลเคาน์เตอร์สำเร็จ');

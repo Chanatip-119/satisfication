@@ -27,10 +27,12 @@
         <a href="{{ route('counter.index') }}" class="menu-item {{ Route::is('counter.*') ? 'active' : '' }}">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item {{ Route::is('staff.index') ? 'active' : '' }}">บุคลากร</a>
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
-
+        @unless($isEmployee)
         <div class="menu-category">ระบบ</div>
-        <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
-    
+        
+            <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
+        @endunless
+
         <div class="user-profile-container">
             <div class="profile-dropdown-menu" id="profileDropdown">
                 <a href="#" class="dropdown-item text-danger" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
@@ -92,6 +94,15 @@
         </div>
         @endif
 
+        {{-- [เพิ่มใหม่ ระดับ 3 ข้อ 12] แสดง validation error จาก Controller
+             เดิม: หน้านี้แสดงแค่ session('error') ถ้ารีเซ็ตรหัสผ่านไม่ผ่าน validation ผู้ใช้จะไม่เห็นข้อความใด ๆ --}}
+        @if($errors->any())
+        <div class="alert-banner" style="background-color: #fff5f5; border-color: #fed7d7; color: #e53e3e;">
+            <span>❌ {{ $errors->first() }}</span>
+            <a href="javascript:void(0)" onclick="this.parentElement.style.display='none'" style="color: #e53e3e;">✕</a>
+        </div>
+        @endif
+
         @if(session('import_errors'))
         <div class="alert-banner" style="background-color: #fffbeb; border-color: #fef3c7; color: #b45309; flex-direction: column; align-items: flex-start;">
             <strong style="margin-bottom: 5px;">⚠️ รายละเอียด Import:</strong>
@@ -104,14 +115,15 @@
         @endif
 
         @unless($isEmployee)
+        @php $next = now()->startOfMonth()->addMonth(); @endphp
         <div class="alert-banner">
-            <span> ตั้งค่ารีเซ็ต Unique ID อัตโนมัติ: ทุกวันที่ 1 ของเดือน— รีเซ็ตครั้งถัดไป 1 พ.ย. 2569</span>
+                <span>ตั้งค่ารีเซ็ต Unique ID อัตโนมัติ: ทุกวันที่ 1 ของเดือน — รีเซ็ตครั้งถัดไป {{ $next->locale('th')->translatedFormat('j M') }} {{ $next->year + 543 }}</span>
             <a href="javascript:void(0)" onclick="openModal('modal-reset')">แก้ไขการตั้งค่า</a>
         </div>
         @endunless
 
         <form action="{{ route('staff.index') }}" method="GET" class="filter-row" id="search-form">
-            <input type="text" name="search" class="search-box" placeholder="ค้นหาชื่อ, ฝ่าย, ตำแหน่ง หรือบทบาท...." value="{{ request('search') }}">
+            <input type="text" name="search" class="search-box" placeholder="ค้นหาชื่อหรือบทบาท...." value="{{ request('search') }}">
             <select name="status" class="dropdown-box" onchange="document.getElementById('search-form').submit();">
                 <option value="">ทุกสถานะ</option>
                 <option value="Active" {{ request('status') == 'Active' ? 'selected' : '' }}>Active</option>
@@ -125,7 +137,9 @@
                     <tr>
                         <th>ชื่อ-นามสกุล</th>
                         <th>บทบาท</th>
+                        @unless($isEmployee)
                         <th>คะแนนเฉลี่ย</th>
+                        @endunless
                         @unless($isEmployee)
                         <th>PIN CODE ( 4 หลัก )</th>
                         @endunless
@@ -138,20 +152,14 @@
                     <tr>
                         <td>
                             <div class="staff-name">{{ $staff->staff_name }}</div>
-                            <div class="staff-id" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                                <span>BUU-{{ str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT) }}</span>
-                                @if(!empty($staff->department) || !empty($staff->position))
-                                    <span style="color: #4a5568; font-size: 11.5px; background: #edf2f7; padding: 1px 7px; border-radius: 4px; font-weight: normal;">
-                                        {{ $staff->position ?? '' }}{{ (!empty($staff->position) && !empty($staff->department)) ? ' • ' : '' }}{{ $staff->department ?? '' }}
-                                    </span>
-                                @endif
-                            </div>
+                            <div class="staff-id">BUU-{{ str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT) }}</div>
                         </td>
                         <td>
                             <span class="badge badge-staff">
                                 {{ $staff->role ? $staff->role->role_name : 'Staff' }}
                             </span>
                         </td>
+                        @unless($isEmployee)
                         <td>
                             @if($staff->avg_rating !== '-')
                                 <span class="badge" style="background: #c6f6d5; color: #22543d; font-weight: 600;">{{ $staff->avg_rating }}</span>
@@ -159,6 +167,7 @@
                                 <span class="text-green">-</span>
                             @endif
                         </td>
+                        @endunless
                         @unless($isEmployee)
                         <td>
                             {{ $staff->staff_pincode }}
@@ -172,6 +181,7 @@
                         </td>
                         <td>
                             @if($isEmployee)
+                                {{-- Employee จะเห็นปุ่มดูรายละเอียดเฉพาะแถวที่เป็นข้อมูลของตัวเองเท่านั้น --}}
                                 @if((int) $staff->staff_id === (int) auth()->user()->staff_id)
                                     <button type="button" class="action-btn" onclick="openStaffPanel({{ $staff->staff_id }})">ดูรายละเอียด</button>
                                 @else
@@ -271,7 +281,7 @@
                 <div class="sp-info-list">
                     <div class="sp-info-item">
                         <span class="sp-info-label">สถานะปัจจุบัน</span>
-                        <span class="status offline" style="padding: 2px 10px; font-size: 12px;" id="sp-status"><div class="status-dot"></div> Offline</span>
+                        <span class="status active" style="padding: 2px 10px; font-size: 12px;" id="sp-status"><div class="status-dot"></div> Active</span>
                     </div>
                     <div class="sp-info-item">
                         <span class="sp-info-label">เคาน์เตอร์ปัจจุบัน</span>
@@ -280,14 +290,6 @@
                     <div class="sp-info-item">
                         <span class="sp-info-label">ช่วงเวลาวันนี้</span>
                         <span class="sp-info-val" id="sp-time-range">-</span>
-                    </div>
-                    <div class="sp-info-item sp-info-item-long">
-                        <span class="sp-info-label">ฝ่าย</span>
-                        <span class="sp-info-val" id="sp-department">-</span>
-                    </div>
-                    <div class="sp-info-item sp-info-item-long">
-                        <span class="sp-info-label">ตำแหน่ง</span>
-                        <span class="sp-info-val" id="sp-position">-</span>
                     </div>
                     @unless($isEmployee)
                     <div class="sp-info-item">
@@ -316,7 +318,7 @@
             </div>
 
             <div id="sp-tab-history" class="sp-section">
-                <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">ประวัติ 7 วันล่าสุด</h4>
+                <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">ประวัติ Check-in 7 ครั้งล่าสุด</h4>
                 <div id="sp-history-container"></div>
             </div>
 
@@ -370,15 +372,9 @@
                     </div>
                 </div>
 
-                <div class="form-row" style="margin-bottom: 20px;">
-                    <div class="form-group">
-                        <label>ฝ่าย</label>
-                        <input type="text" name="department" placeholder="เช่น ฝ่ายเทคโนโลยีสารสนเทศ">
-                    </div>
-                    <div class="form-group">
-                        <label>ตำแหน่ง</label>
-                        <input type="text" name="position" placeholder="เช่น บรรณารักษ์">
-                    </div>
+                <div class="form-group full-width" style="margin-bottom: 20px;">
+                    <label>ตำแหน่ง</label>
+                    <input type="text" name="position" placeholder="เช่น บรรณารักษ์">
                 </div>
 
                 <div class="form-group full-width">
@@ -425,63 +421,42 @@
         </div>
     </div>
 
-    <!-- Modal Import (ดีไซน์ใหม่ จัดเรียงคอลัมน์ A ถึง H แบบตารางปฏิบัติงาน) -->
-    <div id="modal-import" class="modal-overlay" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000;">
-        <div class="modal-content" style="background: #fff; width: 100%; max-width: 580px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); position: relative;">
-            
-            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
-                <div>
-                    <h2 style="font-size: 18px; font-weight: 700; color: #1a202c; margin-bottom: 4px;">Import บุคลากรจาก Excel / CSV</h2>
-                    <p style="color: #718096; font-size: 13px; margin: 0;">อัปโหลดไฟล์ข้อมูลบุคลากรเพื่อเพิ่มข้อมูลรวดเดียวเข้า Database</p>
-                </div>
-                <span class="close-btn" onclick="closeModal('modal-import')" style="cursor: pointer; font-size: 22px; color: #a0aec0; line-height: 1;">&times;</span>
+    <!-- Modal Import -->
+    <div id="modal-import" class="modal-overlay">
+        <div class="modal-content" style="max-width: 620px;">
+            <div class="modal-header">
+                <h2>Import บุคลากรจาก Excel / CSV</h2>
+                <span class="close-btn" onclick="closeModal('modal-import')">&times;</span>
             </div>
-
-            <div style="background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #2b6cb0; margin-bottom: 20px;">
-                <div style="font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                    รูปแบบคอลัมน์ที่รองรับ (แถวแรกต้องเป็น Header):
-                </div>
-                <div style="font-size: 12.5px; line-height: 1.6; color: #2c5282;">
-                    • <strong>A:</strong> staff_id (รหัสพนักงาน เช่น BUU-010)<br>
-                    • <strong>B:</strong> staff_name (ชื่อ-นามสกุล)<br>
-                    • <strong>C:</strong> staff_email (อีเมลพนักงาน)<br>
-                    • <strong>D:</strong> staff_pincode (รหัส PIN 4 หลัก)<br>
-                    • <strong>E:</strong> password (รหัสผ่าน อย่างน้อย 6 ตัวอักษร)<br>
-                    • <strong>F:</strong> role_id (ระดับสิทธิ์ เช่น 4 = Employee)<br>
-                    • <strong>G:</strong> department (ฝ่าย)<br>
-                    • <strong>H:</strong> position (ตำแหน่ง)
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <a href="{{ route('staff.downloadTemplate') ?? '#' }}" class="btn btn-outline" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; font-size: 13px; text-decoration: none; border: 1px solid #cbd5e0; border-radius: 6px; color: #4a5568; background: #fff; font-weight: 500;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    ดาวน์โหลด Template (.csv)
-                </a>
-            </div>
-
             <form action="{{ route('staff.import') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                <div style="margin-bottom: 8px; font-weight: 600; font-size: 13.5px; color: #2d3748;">เลือกไฟล์</div>
-                <div id="drop-zone" style="border: 2px dashed #cbd5e0; padding: 25px; text-align: center; border-radius: 8px; margin-bottom: 20px; background: #f7fafc; cursor: pointer; transition: all 0.2s;" onclick="document.getElementById('excel-file-input').click();">
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="1.5" style="margin-bottom: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                    <div style="color: #4a5568; font-size: 14px; font-weight: 500; margin-bottom: 4px;">คลิกเลือก หรือ ลากไฟล์มาวางที่นี่</div>
-                    <div style="color: #a0aec0; font-size: 12px;">รองรับ .csv, .xlsx, .xls (สูงสุด 10MB)</div>
+                <div id="drop-zone" style="border: 2px dashed #cbd5e0; padding: 30px; text-align: center; border-radius: 10px; margin-bottom: 20px; background: #f7fafc; cursor: pointer;" onclick="document.getElementById('excel-file-input').click();">
+                    <h3>ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</h3>
                     <input type="file" name="excel_file" id="excel-file-input" accept=".csv,.xlsx,.xls" style="display: none;" onchange="showFileName(this)">
-                    <div id="file-name-display" style="display: none; margin-top: 12px; padding: 8px 12px; background: #e2e8f0; border-radius: 6px; font-size: 13px; font-weight: 600; color: #2d3748;"></div>
+                    <div id="file-name-display" style="display: none; margin-top: 15px; font-weight: 600;"></div>
                 </div>
-
-                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #edf2f7; padding-top: 15px; margin-top: 10px;">
-                    <button type="button" class="btn btn-outline" onclick="closeModal('modal-import')" style="padding: 8px 18px; border: 1px solid #cbd5e0; background: #fff; border-radius: 6px; color: #4a5568; cursor: pointer; font-size: 13.5px;">ยกเลิก</button>
-                    <button type="submit" class="btn btn-yellow" style="padding: 8px 20px; background: #ecc94b; border: none; border-radius: 6px; color: #1a202c; font-weight: 600; cursor: pointer; font-size: 13.5px;">ยืนยันการ Import</button>
+                <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-weight: 600; font-size: 14px; color: #2d3748;">รูปแบบไฟล์ที่รองรับ</span>
+                        <a href="{{ route('staff.downloadTemplate') }}" class="btn" style="padding: 6px 14px; font-size: 13px;">ดาวน์โหลด Template</a>
+                    </div>
+                    <p style="font-size: 13px; color: #718096; margin: 0;">คอลัมน์: staff_id, staff_name, staff_email, staff_pincode, password, role_id, department, position</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-import')">ยกเลิก</button>
+                    <button type="submit" class="btn btn-yellow">นำเข้าข้อมูลทั้งหมด</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Modal Reset Password -->
-    <div id="modal-reset-password" class="modal-overlay">
+    {{-- ===== [แก้ไข ระดับ 3 ข้อ 12] Modal รีเซ็ตรหัสผ่านให้ใช้งานได้จริง =====
+         เดิม: 1) ฟอร์มไม่มีช่อง reset_type / new_password ที่ StaffController::resetPassword() ต้องใช้
+               2) action="" จึงส่งไปที่ /staff (store) แล้วได้ validation error แทน
+               3) z-index 1000 ต่ำกว่า Side Panel (1060) ถ้าเปิดจาก Panel Modal จะไปอยู่ข้างหลัง มองไม่เห็น
+         ใหม่: เลือกได้ว่ารีเซ็ตเป็น 123456 หรือกำหนดเอง และตั้ง z-index ให้อยู่เหนือ Side Panel --}}
+    <div id="modal-reset-password" class="modal-overlay" style="z-index: 1100;">
         <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
                 <div>
@@ -491,8 +466,25 @@
                 <span class="close-btn" onclick="closeModal('modal-reset-password')">&times;</span>
             </div>
 
-            <form id="form-reset-password" method="POST" action="">
+            <form id="form-reset-password" method="POST" action="" onsubmit="return validateResetPasswordForm()">
                 @csrf
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 8px; cursor: pointer; font-size: 14px; color: #2d3748;">
+                        <input type="radio" name="reset_type" value="default" checked onchange="toggleCustomPassword()">
+                        <span>รีเซ็ตเป็นรหัสผ่านเริ่มต้น <strong>123456</strong></span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 8px; cursor: pointer; font-size: 14px; color: #2d3748;">
+                        <input type="radio" name="reset_type" value="custom" onchange="toggleCustomPassword()">
+                        <span>กำหนดรหัสผ่านใหม่เอง</span>
+                    </label>
+                </div>
+
+                <div id="custom-password-box" style="display: none; margin-bottom: 10px;">
+                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #4a5568;">รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)</label>
+                    <input type="password" name="new_password" id="reset-new-password" minlength="6" autocomplete="new-password" style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 8px; outline: none; font-family: 'Sarabun', sans-serif;">
+                </div>
+                {{-- ===== [จบ ข้อ 12: Modal] ===== --}}
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" onclick="closeModal('modal-reset-password')">ยกเลิก</button>
                     <button type="submit" class="btn btn-yellow">ยืนยันรีเซ็ตรหัสผ่าน</button>
@@ -502,8 +494,18 @@
     </div>
     @endunless
 
-    <!-- JavaScript -->
+    <!-- JavaScript ทั้งหมด -->
     <script>
+        // ===== [เพิ่มใหม่ ระดับ 1 ข้อ 1] ป้องกัน XSS =====
+        // แปลงอักขระพิเศษก่อนนำข้อความจาก API ไปใส่ใน innerHTML
+        // ความคิดเห็นมาจากผู้รับบริการที่ไม่ต้องล็อกอิน ถ้าไม่แปลง โค้ดที่ฝังมาจะทำงานในเบราว์เซอร์ของแอดมิน
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+        // ===== [จบ ข้อ 1: escapeHtml] =====
+
         function openModal(modalId) {
             const m = document.getElementById(modalId);
             if(m) m.style.display = 'flex';
@@ -556,8 +558,57 @@
 
         let currentPanelStaffId = null;
 
+        // ===== [เพิ่มใหม่ ระดับ 3 ข้อ 12] ฟังก์ชันรีเซ็ตรหัสผ่าน =====
+        // เดิม: ปุ่มในเมนู "การดำเนินการ" และใน Side Panel เรียก openResetPasswordModal() / openResetPasswordFromPanel()
+        //       ซึ่งไม่มีอยู่ในไฟล์ กดแล้วเกิด JS error และไม่มีอะไรเกิดขึ้น
+        function openResetPasswordModal(staffId, staffName, staffCode) {
+            const form = document.getElementById('form-reset-password');
+            if (!form) return;
+
+            form.action = '/staff/' + encodeURIComponent(staffId) + '/reset-password';
+            form.reset();
+            toggleCustomPassword();
+            document.getElementById('reset-pw-staff-info').innerText = 'บุคลากร: ' + staffName + ' (' + staffCode + ')';
+            openModal('modal-reset-password');
+        }
+
+        function openResetPasswordFromPanel() {
+            if (!currentPanelStaffId) return;
+            const staffName = document.getElementById('sp-name').innerText || '-';
+            const staffCode = document.getElementById('sp-code').innerText || '-';
+            openResetPasswordModal(currentPanelStaffId, staffName, staffCode);
+        }
+
+        function toggleCustomPassword() {
+            const customRadio = document.querySelector('#form-reset-password input[name="reset_type"][value="custom"]');
+            const box = document.getElementById('custom-password-box');
+            const input = document.getElementById('reset-new-password');
+            if (!customRadio || !box || !input) return;
+
+            const isCustom = customRadio.checked;
+            box.style.display = isCustom ? 'block' : 'none';
+            input.required = isCustom;
+            if (!isCustom) input.value = '';
+        }
+
+        function validateResetPasswordForm() {
+            const isCustom = document.querySelector('#form-reset-password input[name="reset_type"][value="custom"]').checked;
+            const newPassword = document.getElementById('reset-new-password').value;
+
+            if (isCustom && newPassword.length < 6) {
+                alert('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+                return false;
+            }
+
+            const label = isCustom ? 'รหัสผ่านที่กำหนด' : '123456';
+            return confirm('ยืนยันรีเซ็ตรหัสผ่านของ ' + document.getElementById('reset-pw-staff-info').innerText.replace('บุคลากร: ', '') + ' เป็น ' + label + ' ใช่หรือไม่?');
+        }
+        // ===== [จบ ข้อ 12: ฟังก์ชัน] =====
+
+        // ===== ฟังก์ชันเปิด Side Panel พร้อมรองรับสิทธิ์ Employee =====
         function openStaffPanel(staffId) {
             @if($isEmployee)
+                // ถ้าเป็น Employee ให้บังคับใช้ ID ของตัวเองทันที เพื่อป้องกันข้อผิดพลาด
                 staffId = {{ auth()->user()->staff_id }};
             @endif
 
@@ -570,8 +621,6 @@
             
             document.getElementById('sp-name').innerText = "กำลังโหลดข้อมูล...";
             document.getElementById('sp-code').innerText = "BUU-...";
-            document.getElementById('sp-department').innerText = "-";
-            document.getElementById('sp-position').innerText = "-";
             document.getElementById('sp-avg-rating').innerText = "-";
             document.getElementById('sp-total-checkins').innerText = "-";
             document.getElementById('sp-total-comments').innerText = "-";
@@ -597,8 +646,6 @@
             .then(data => {
                 document.getElementById('sp-name').innerText = data.name || '-';
                 document.getElementById('sp-code').innerText = data.code || '-';
-                document.getElementById('sp-department').innerText = data.department || '-';
-                document.getElementById('sp-position').innerText = data.position || '-';
                 
                 const pinEl = document.getElementById('sp-pin');
                 if (pinEl) {
@@ -613,8 +660,13 @@
                 
                 const statusEl = document.getElementById('sp-status');
                 if (statusEl) {
-                    statusEl.innerHTML = '<div class="status-dot"></div> ' + (data.status || 'Offline');
-                    statusEl.className = (data.status === 'Check-ins') ? 'status active' : 'status offline';
+                    // [แก้ไข ระดับ 3 ข้อ 16] แสดงสถานะการ Check-in เป็นข้อความที่ชัดเจน
+                    // เดิม: แสดงค่า data.status ตรง ๆ ซึ่ง Controller ส่งมาเป็น 'Check-ins' / 'Offline'
+                    //       จึงขึ้นคำว่า "Check-ins" สีเทาแม้คนนั้นกำลัง Check-in อยู่ และสับสนกับ Active ในตาราง (= ล็อกอินอยู่)
+                    // (escape ตาม [ระดับ 1 ข้อ 1] ยังคงไว้)
+                    const isCheckedIn = data.status === 'Active';
+                    statusEl.innerHTML = '<div class="status-dot"></div> ' + escapeHtml(isCheckedIn ? 'Check-in อยู่' : 'ไม่ได้ Check-in');
+                    statusEl.className = isCheckedIn ? 'status active' : 'status offline';
                 }
 
                 let progHtml = '';
@@ -635,26 +687,31 @@
                 }
                 document.getElementById('sp-progress-container').innerHTML = progHtml;
 
+                // ===== [แก้ไข ระดับ 1 ข้อ 1] ความคิดเห็น: escape ทุกค่าที่มาจาก API =====
+                // เดิม: ${c.counter || ...} / ${c.time || ''} / ${c.text || ...} ใส่ลง innerHTML ตรง ๆ
+                //       และ let score = c.rating || 0; ไม่ได้จำกัดค่า 0–5
                 let cmtHtml = '';
                 if (!data.comments || data.comments.length === 0) {
                     cmtHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีความคิดเห็น</p>';
                 } else {
                     data.comments.forEach(c => {
-                        let score = c.rating || 0;
+                        let score = Math.min(5, Math.max(0, parseInt(c.rating, 10) || 0));
                         let stars = '★'.repeat(score) + '☆'.repeat(5 - score);
                         cmtHtml += `
                             <div class="sp-card" style="padding:12px; background:#f8fafc; border-radius:8px; margin-bottom:10px; border:1px solid #e2e8f0;">
                                 <div class="sp-card-header" style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px;">
-                                    <div class="sp-card-title" style="color:#3182ce; font-weight:600;">${c.counter || 'เคาน์เตอร์'}</div>
-                                    <div class="sp-card-date" style="color:#a0aec0;">${c.time || ''}</div>
+                                    <div class="sp-card-title" style="color:#3182ce; font-weight:600;">${escapeHtml(c.counter || 'เคาน์เตอร์')}</div>
+                                    <div class="sp-card-date" style="color:#a0aec0;">${escapeHtml(c.time || '')}</div>
                                 </div>
-                                <div class="sp-card-desc" style="color:#1a202c; font-weight:500; font-size:13px;">${c.text || 'ไม่มีข้อความ'}</div>
+                                <div class="sp-card-desc" style="color:#1a202c; font-weight:500; font-size:13px;">${escapeHtml(c.text || 'ไม่มีข้อความ')}</div>
                                 <div class="star-rating" style="color:#d69e2e; font-size:12px; margin-top:4px;">${stars}</div>
                             </div>`;
                     });
                 }
                 document.getElementById('sp-comments-container').innerHTML = cmtHtml;
+                // ===== [จบ ข้อ 1: ความคิดเห็น] =====
 
+                // ===== [แก้ไข ระดับ 1 ข้อ 1] ประวัติ Check-in: escape ทุกค่าที่มาจาก API =====
                 let histHtml = '';
                 if (!data.history || data.history.length === 0) {
                     histHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีประวัติ Check-in</p>';
@@ -663,14 +720,15 @@
                         histHtml += `
                             <div class="sp-card" style="padding:10px; border-bottom:1px solid #edf2f7; font-size:13px;">
                                 <div class="sp-card-header" style="display:flex; justify-content:space-between; font-weight:600;">
-                                    <div class="sp-card-title">${h.date || ''} — ${h.counter || ''}</div>
-                                    <div class="sp-card-right" style="color:#2b6cb0;">${h.avg || '-'} (${h.count || 0} ครั้ง)</div>
+                                    <div class="sp-card-title">${escapeHtml(h.date || '')} — ${escapeHtml(h.counter || '')}</div>
+                                    <div class="sp-card-right" style="color:#2b6cb0;">${escapeHtml(h.avg || '-')} (${escapeHtml(h.count || 0)} ครั้ง)</div>
                                 </div>
-                                <div class="sp-card-desc" style="color:#718096; font-size:12px; margin-top:2px;">${h.time || ''}</div>
+                                <div class="sp-card-desc" style="color:#718096; font-size:12px; margin-top:2px;">${escapeHtml(h.time || '')}</div>
                             </div>`;
                     });
                 }
                 document.getElementById('sp-history-container').innerHTML = histHtml;
+                // ===== [จบ ข้อ 1: ประวัติ] =====
             })
             .catch(error => {
                 console.error(error);
@@ -678,6 +736,7 @@
             });
         }
 
+        // จัดการเปลี่ยน Role ผ่าน Dropdown ในตาราง
         document.querySelectorAll('.role-select').forEach(function(select) {
             select.addEventListener('change', function() {
                 const staffId = this.dataset.staffId;
@@ -742,20 +801,6 @@
             toast.setAttribute('role', isError ? 'alert' : 'status');
             clearTimeout(toast.hideTimer);
             toast.hideTimer = setTimeout(() => { toast.style.opacity = '0'; }, isError ? 5000 : 2500);
-        }
-
-        function showFileName(input) {
-            const display = document.getElementById('file-name-display');
-            if (input.files && input.files[0]) {
-                display.style.display = 'block';
-                display.innerHTML = '📄 ' + input.files[0].name + ' (' + (input.files[0].size / 1024).toFixed(1) + ' KB)';
-                document.getElementById('drop-zone').style.borderColor = '#48bb78';
-                document.getElementById('drop-zone').style.background = '#f0fff4';
-            } else {
-                display.style.display = 'none';
-                document.getElementById('drop-zone').style.borderColor = '#cbd5e0';
-                document.getElementById('drop-zone').style.background = '#f7fafc';
-            }
         }
 
         function toggleProfileDropdown() {

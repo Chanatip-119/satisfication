@@ -9,6 +9,7 @@ use App\Models\Evaluation;
 use App\Models\Staff;
 use App\Models\Qr_Code;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter; // [แก้ไข ระดับ 1 ข้อ 4] ใช้กันการกดส่งประเมินซ้ำ
 use Carbon\Carbon;
 
 class EvaluationController extends Controller
@@ -59,12 +60,36 @@ class EvaluationController extends Controller
     {
         $request->validate([
             'rating' => 'required|integer|min:1|max:5',
-            'comment' => 'nullable|string|max:2500',
+            // [แก้ไข ระดับ 2 ข้อ 11] จำกัดความยาวให้ตรงกับคอลัมน์ comment ใน DB (string 255)
+            // เดิม: 'nullable|string|max:2500' — พิมพ์เกิน 255 ตัวแล้ว MySQL error เป็นหน้า 500 และคะแนนหาย
+            'comment' => 'nullable|string|max:255',
             'checkin_id' => 'required|exists:checkin,checkin_id', // เช็คให้ชัวร์ว่า ID มีอยู่จริง
             'counter_sub_id' => 'required' // รับค่าไว้สำหรับ Redirect กลับไปหน้าเดิม
+        ], [
+            // [แก้ไข ระดับ 2 ข้อ 11] ข้อความ error ภาษาไทยที่ผู้รับบริการเข้าใจได้
+            'rating.required' => 'กรุณาเลือกระดับความพึงพอใจ',
+            'comment.max' => 'ข้อเสนอแนะต้องไม่เกิน 255 ตัวอักษร',
+            'checkin_id.exists' => 'เจ้าหน้าที่ประจำเคาน์เตอร์เปลี่ยนแล้ว กรุณาประเมินใหม่อีกครั้ง',
         ]);
 
-        Evaluation::create($request->all());
+        // ===== [แก้ไข ระดับ 1 ข้อ 4] กันการกดส่งประเมินซ้ำ / ปั่นคะแนน =====
+        // - ต่อเครื่อง (session) ต่อการ Check-in: ส่งได้ 1 ครั้งภายใน 2 นาที
+        // - ต่อ IP: ไม่เกิน 60 ครั้งใน 10 นาที (เผื่อผู้ใช้หลายคนใช้ Wi-Fi ห้องสมุดร่วมกัน)
+        $deviceKey = 'evaluation:' . $request->session()->getId() . ':' . $request->checkin_id;
+        $ipKey = 'evaluation-ip:' . $request->ip();
+
+        if (RateLimiter::tooManyAttempts($deviceKey, 1) || RateLimiter::tooManyAttempts($ipKey, 60)) {
+            return redirect()->route('evaluation.create', ['counter_sub_id' => $request->counter_sub_id])
+                ->withErrors(['rating' => 'คุณเพิ่งส่งการประเมินไปแล้ว กรุณารอสักครู่ก่อนส่งอีกครั้ง']);
+        }
+
+        RateLimiter::hit($deviceKey, 120);
+        RateLimiter::hit($ipKey, 600);
+        // ===== [จบ ข้อ 4] =====
+
+        // [แก้ไข ระดับ 1 ข้อ 4] บันทึกเฉพาะฟิลด์ที่ต้องใช้
+        // เดิม: Evaluation::create($request->all());
+        Evaluation::create($request->only(['rating', 'comment', 'checkin_id']));
 
         // ส่ง counter_sub_id กลับไปใน Route เพื่อให้หน้าโหลดซ้ำได้ถูกเคาน์เตอร์
         return redirect()->route('evaluation.create', ['counter_sub_id' => $request->counter_sub_id])

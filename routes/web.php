@@ -25,15 +25,25 @@ Route::middleware('guest')->group(function () {
     })->name('register');
 
     // Traditional login & register
+    // หมายเหตุ: การจำกัดจำนวนครั้งของ login ทำใน AuthController::login() (นับเฉพาะครั้งที่ผิด)
     Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
-    Route::post('/register', [AuthController::class, 'register'])->name('register.store');
+
+    // [แก้ไข ระดับ 1 ข้อ 4] จำกัดการสมัครสมาชิก 5 ครั้ง/นาที ต่อ IP
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('register.store');
 
     // Password Reset Routes
     Route::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'])->name('password.request');
-    Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->name('password.email');
+
+    // [แก้ไข ระดับ 1 ข้อ 4] จำกัดการขอลิงก์รีเซ็ตทางอีเมล 5 ครั้ง/นาที ต่อ IP
+    Route::post('/forgot-password', [AuthController::class, 'sendResetLinkEmail'])->middleware('throttle:5,1')->name('password.email');
+
+    // หมายเหตุ: การจำกัดการเดา PIN ทำใน AuthController::resetPasswordWithPin() (นับเฉพาะครั้งที่ผิด)
     Route::post('/forgot-password/pin', [AuthController::class, 'resetPasswordWithPin'])->name('password.reset.pin');
+
     Route::get('/reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])->name('password.reset');
-    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+
+    // [แก้ไข ระดับ 1 ข้อ 4] จำกัดการตั้งรหัสผ่านใหม่ 10 ครั้ง/นาที ต่อ IP
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1')->name('password.update');
 });
 
 // =========================================================================
@@ -41,12 +51,17 @@ Route::middleware('guest')->group(function () {
 // ให้ผู้มาใช้บริการสแกน QR Code ประเมิน หรือเจ้าหน้าที่กด Check-in หน้าเคาน์เตอร์ได้
 // =========================================================================
 Route::get('/evaluation/{counter_sub_id}', [EvaluationController::class, 'create'])->name('evaluation.create');
+// หมายเหตุ: การกันส่งประเมินซ้ำทำใน EvaluationController::store() [ระดับ 1 ข้อ 4]
 Route::post('/evaluation', [EvaluationController::class, 'store'])->name('evaluation.store');
 
 Route::get('/checkin', [CheckinController::class, 'index'])->name('checkin.index');
+// [เพิ่มใหม่ ระดับ 3 ข้อ 17] API เช็คสถานะแบบเบา ใช้แทนการดึงหน้า /checkin ทั้งหน้าซ้ำทุก 4 วินาที
+Route::get('/checkin/status', [CheckinController::class, 'status'])->name('checkin.status');
 Route::post('/checkin/step1', [CheckinController::class, 'step1'])->name('checkin.step1');
+// หมายเหตุ: การจำกัดการเดา PIN ทำใน CheckinController::step2() [ระดับ 1 ข้อ 4]
 Route::post('/checkin/step2', [CheckinController::class, 'step2'])->name('checkin.step2');
 Route::post('/checkin/step3', [CheckinController::class, 'step3'])->name('checkin.step3');
+// หมายเหตุ: Check-out ได้เฉพาะเครื่องที่ใช้ Check-in ตรวจใน CheckinController::checkout() [ระดับ 1 ข้อ 7]
 Route::post('/checkin/checkout', [CheckinController::class, 'checkout'])->name('checkin.checkout');
 
 // =========================================================================
@@ -54,8 +69,9 @@ Route::post('/checkin/checkout', [CheckinController::class, 'checkout'])->name('
 // หากยังไม่ล็อกอินแล้วพิมพ์ URL เข้ามา จะถูก Redirect ไปหน้า Login (/) ทันที
 // =========================================================================
 Route::middleware('auth')->group(function () {
-    // ออกจากระบบ (รองรับทั้ง GET จากปุ่มลิงก์ และ POST)
-    Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->name('logout');
+    // [แก้ไข ระดับ 1 ข้อ 2 — แนะนำเพิ่มเติม] ออกจากระบบรับเฉพาะ POST
+    // เดิม: Route::match(['get', 'post'], '/logout', ...) — GET ไม่ผ่าน CSRF ทำให้ใครก็สั่งให้ผู้ใช้ออกจากระบบได้ด้วยลิงก์
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // หน้าแดชบอร์ด
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -65,7 +81,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/schedule/store', [ScheduleController::class, 'store'])->middleware('can:manage-admin')->name('schedule.store');
     Route::post('/schedule/update/{id}', [ScheduleController::class, 'update'])->middleware('can:manage-admin')->name('schedule.update');
     Route::delete('/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->middleware('can:manage-admin')->name('schedule.destroy');
-    Route::match(['get', 'delete'], '/schedule/delete/{id}', [ScheduleController::class, 'destroy'])->middleware('can:manage-admin')->name('schedule.destroy');
+    // [แก้ไข ระดับ 1 ข้อ 2] ลบ route ที่ให้ลบกะผ่าน GET ออกแล้ว
+    // เดิม: Route::match(['get', 'delete'], '/schedule/delete/{id}', ...)->name('schedule.destroy');
+    // เหตุผล: GET ไม่ผ่านการตรวจ CSRF แค่เปิดลิงก์หรือรูปภาพที่ชี้มา URL นี้ก็ลบกะได้ทันที
     Route::post('/schedule/import', [ScheduleController::class, 'importExcel'])->middleware('can:manage-admin')->name('schedule.import');
     Route::get('/schedule/download-template', [ScheduleController::class, 'downloadTemplate'])->name('schedule.downloadTemplate');
 
@@ -82,6 +100,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/staff/{id}', [StaffController::class, 'destroy'])->name('staff.destroy');
     });
     Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+    // หมายเหตุ: พนักงานดูได้เฉพาะข้อมูลตัวเอง ตรวจใน StaffController::show() [ระดับ 1 ข้อ 6]
     Route::get('/staff/{id}', [StaffController::class, 'show'])->name('staff.show');
 
     // จัดการเคาน์เตอร์ (Counter)

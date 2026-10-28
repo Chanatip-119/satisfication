@@ -28,10 +28,10 @@
         <a href="{{ route('counter.index') }}" class="menu-item {{ Route::is('counter.*') ? 'active' : '' }}">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item {{ Route::is('staff.index') ? 'active' : '' }}">บุคลากร</a>
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
-
+        @unless($isEmployee)
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
-
+        @endunless
         <div class="user-profile-container">
             <!-- เมนู Dropdown (ซ่อนไว้เริ่มต้น) -->
             <div class="profile-dropdown-menu" id="profileDropdown">
@@ -213,7 +213,7 @@
             </div>
 
             <div id="sp-tab-history" class="sp-section">
-                <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">ประวัติ 7 วันล่าสุด</h4>
+                <h4 style="font-size: 13px; color: #718096; margin-bottom: 15px;">ประวัติ Check-in 7 ครั้งล่าสุด</h4>
                 <div id="sp-history-container"></div>
             </div>
 
@@ -225,6 +225,16 @@
     </div>
 
     <script>
+        // ===== [เพิ่มใหม่ ระดับ 1 ข้อ 1] ป้องกัน XSS =====
+        // แปลงอักขระพิเศษก่อนนำข้อความจาก API ไปใส่ใน innerHTML
+        // ความคิดเห็นมาจากผู้รับบริการที่ไม่ต้องล็อกอิน ถ้าไม่แปลง โค้ดที่ฝังมาจะทำงานในเบราว์เซอร์ของแอดมิน
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+        // ===== [จบ ข้อ 1: escapeHtml] =====
+
         function closeStaffPanel() {
             document.getElementById('staff-panel').classList.remove('open');
             document.getElementById('staff-panel-overlay').classList.remove('show');
@@ -275,21 +285,17 @@
                 document.getElementById('sp-current-counter').innerText = data.current_counter;
                 document.getElementById('sp-time-range').innerText = data.time_range;
                 
-                // อัปเดตสถานะใน Side Panel ให้เป็น Active / Offline แบบมีกรอบแคปซูล
-                const rawStatus = (data.status || 'Offline').toLowerCase();
-                const isActive = (rawStatus === 'active' || rawStatus === 'checkin');
-                const displayStatus = isActive ? 'Active' : 'Offline';
-
-                const statusContainer = document.getElementById('sp-status');
-                const statusDot = document.getElementById('sp-status-dot');
-                const statusText = document.getElementById('sp-status-text');
-
-                if (statusContainer && statusDot && statusText) {
-                    statusText.innerText = displayStatus;
-                    statusContainer.style.background = isActive ? '#f0fff4' : '#edf2f7';
-                    statusContainer.style.color = isActive ? '#276749' : '#4a5568';
-                    statusDot.style.background = isActive ? '#48bb78' : '#a0aec0';
+                // ===== [แก้ไข ระดับ 3 ข้อ 16] สถานะใน Side Panel แสดงได้ถูกต้อง =====
+                // เดิม: หา element 'sp-status-dot' และ 'sp-status-text' ซึ่งไม่มีอยู่ในหน้า เงื่อนไขจึงไม่ผ่าน
+                //       Panel จึงค้างคำว่า "Active" สีเขียวที่ hardcode ไว้ใน HTML สำหรับทุกคน
+                // ใหม่: ใช้ element 'sp-status' ที่มีอยู่จริง และแสดงข้อความชัดเจนแบบเดียวกับหน้าจัดการบุคลากร
+                const statusEl = document.getElementById('sp-status');
+                if (statusEl) {
+                    const isCheckedIn = data.status === 'Active';
+                    statusEl.innerHTML = '<div class="status-dot"></div> ' + escapeHtml(isCheckedIn ? 'Check-in อยู่' : 'ไม่ได้ Check-in');
+                    statusEl.className = isCheckedIn ? 'status active' : 'status offline';
                 }
+                // ===== [จบ ข้อ 16] =====
 
                 let progHtml = '';
                 for(let i=5; i>=1; i--) {
@@ -305,41 +311,48 @@
                 }
                 document.getElementById('sp-progress-container').innerHTML = progHtml;
 
+                // ===== [แก้ไข ระดับ 1 ข้อ 1] ความคิดเห็น: escape ทุกค่าที่มาจาก API =====
+                // เดิม: ${c.counter} / ${c.time} / ${c.text} ใส่ลง innerHTML ตรง ๆ
+                //       และ '★'.repeat(c.rating) ไม่ได้จำกัดค่า
                 let cmtHtml = '';
-                if(data.comments.length === 0) {
+                if (!data.comments || data.comments.length === 0) {
                     cmtHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีความคิดเห็น</p>';
                 } else {
                     data.comments.forEach(c => {
-                        let stars = '★'.repeat(c.rating) + '☆'.repeat(5 - c.rating);
+                        let score = Math.min(5, Math.max(0, parseInt(c.rating, 10) || 0));
+                        let stars = '★'.repeat(score) + '☆'.repeat(5 - score);
                         cmtHtml += `
                             <div class="sp-card">
                                 <div class="sp-card-header">
-                                    <div class="sp-card-title" style="color:#3182ce;">${c.counter}</div>
-                                    <div class="sp-card-date">${c.time}</div>
+                                    <div class="sp-card-title" style="color:#3182ce;">${escapeHtml(c.counter)}</div>
+                                    <div class="sp-card-date">${escapeHtml(c.time)}</div>
                                 </div>
-                                <div class="sp-card-desc" style="color:#1a202c; font-weight:500;">${c.text}</div>
+                                <div class="sp-card-desc" style="color:#1a202c; font-weight:500;">${escapeHtml(c.text)}</div>
                                 <div class="star-rating">${stars}</div>
                             </div>`;
                     });
                 }
                 document.getElementById('sp-comments-container').innerHTML = cmtHtml;
+                // ===== [จบ ข้อ 1: ความคิดเห็น] =====
 
+                // ===== [แก้ไข ระดับ 1 ข้อ 1] ประวัติ Check-in: escape ทุกค่าที่มาจาก API =====
                 let histHtml = '';
-                if(data.history.length === 0) {
+                if (!data.history || data.history.length === 0) {
                     histHtml = '<p style="font-size:13px; color:#a0aec0;">ไม่มีประวัติ Check-in</p>';
                 } else {
                     data.history.forEach(h => {
                         histHtml += `
                             <div class="sp-card">
                                 <div class="sp-card-header">
-                                    <div class="sp-card-title">${h.date} — ${h.counter}</div>
-                                    <div class="sp-card-right">${h.avg} (${h.count} ครั้ง)</div>
+                                    <div class="sp-card-title">${escapeHtml(h.date)} — ${escapeHtml(h.counter)}</div>
+                                    <div class="sp-card-right">${escapeHtml(h.avg)} (${escapeHtml(h.count)} ครั้ง)</div>
                                 </div>
-                                <div class="sp-card-desc">${h.time}</div>
+                                <div class="sp-card-desc">${escapeHtml(h.time)}</div>
                             </div>`;
                     });
                 }
                 document.getElementById('sp-history-container').innerHTML = histHtml;
+                // ===== [จบ ข้อ 1: ประวัติ] =====
             })
             .catch(error => {
                 document.getElementById('sp-name').innerText = "เกิดข้อผิดพลาดในการดึงข้อมูล";

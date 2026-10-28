@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="{{ asset('css/report.css') }}?v={{ filemtime(public_path('css/report.css')) }}">
 </head>
 <body>
+@php
+    $isEmployee = auth()->check() && auth()->user()->isEmployee();
+@endphp
 
     <aside class="sidebar">
         <div class="sidebar-logo">
@@ -24,10 +27,10 @@
         <a href="{{ route('counter.index') }}" class="menu-item {{ Route::is('counter.*') ? 'active' : '' }}">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item">บุคลากร</a>
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
-
+        @unless($isEmployee)
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
-
+        @endunless
         <div class="user-profile-container">
             <!-- เมนู Dropdown (ซ่อนไว้เริ่มต้น) -->
             <div class="profile-dropdown-menu" id="profileDropdown">
@@ -57,6 +60,15 @@
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon"><polyline points="18 15 12 9 6 15"></polyline></svg>
         </div>
+
+            {{-- ===== [แก้ไข ระดับ 3 ข้อ 13] เพิ่มฟอร์ม logout ที่หายไป =====
+                 เดิม: หน้านี้ไม่มี <form id="logout-form"> เมนู "ออกจากระบบ" จึงเกิด JS error และกดแล้วไม่มีอะไรเกิดขึ้น --}}
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                @csrf
+            </form>
+        </div>
+        {{-- [แก้ไข ระดับ 3 ข้อ 13] ปิด </div> ของ .user-profile-container ที่เดิมไม่มีแท็กปิด --}}
+        {{-- ===== [จบ ข้อ 13] ===== --}}
     </aside>
 
     <main class="content">
@@ -107,9 +119,15 @@
                         <td>{{ $c->counter_name }}</td>
                         <td>{{ $c->name }}</td>
                         <td>
-                            <span class="rating-badge {{ $c->avg_rating >= 4 ? 'rating-good' : 'rating-bad' }}">
-                                {{ $c->avg_rating }}
-                            </span>
+                            {{-- [เพิ่มเติม ระดับ 3] จุดที่ยังไม่มีการประเมินแสดง "—" สีเทา
+                                 เดิม: แสดง "0.0" ในป้ายเดียวกับคะแนนต่ำ ทำให้ดูเหมือนจุดนั้นได้คะแนนแย่ ทั้งที่ยังไม่มีใครประเมิน --}}
+                            @if($c->eval_count > 0)
+                                <span class="rating-badge {{ $c->avg_rating >= 4 ? 'rating-good' : 'rating-bad' }}">
+                                    {{ $c->avg_rating }}
+                                </span>
+                            @else
+                                <span style="color: #a0aec0;">—</span>
+                            @endif
                         </td>
                         <td>{{ number_format($c->eval_count) }}</td>
                         <td>{{ $c->current_staff }}</td>

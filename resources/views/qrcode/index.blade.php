@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="{{ asset('css/qrcode.css') }}?v={{ time() }}">
 </head>
 <body>
+@php
+    $isEmployee = auth()->check() && auth()->user()->isEmployee();
+@endphp
     
     <!-- แถบเมนูด้านซ้าย -->
     <div class="sidebar">
@@ -24,9 +27,12 @@
         <a href="{{ route('counter.index') }}" class="menu-item">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item">บุคลากร</a>
         <a href="{{ url('/qrcode') }}" class="menu-item active">QR Code</a>
+        @unless($isEmployee)
         <div class="menu-category">ระบบ</div>
+        @endunless
+        @unless($isEmployee)
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
-
+        @endunless
         <!-- ส่วนโปรไฟล์ผู้ใช้งาน -->
         <div class="user-profile-container">
             <!-- เมนู Dropdown -->

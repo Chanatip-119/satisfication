@@ -26,8 +26,10 @@
         <a href="{{ route('counter.index') }}" class="menu-item">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item">บุคลากร</a>
         <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
+        @unless($isEmployee)
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
+        @endunless
         
         <div class="user-profile-container">
             <div class="profile-dropdown-menu" id="profileDropdown">

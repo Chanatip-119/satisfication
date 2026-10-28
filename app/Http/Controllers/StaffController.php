@@ -7,6 +7,7 @@ use App\Models\Staff;
 use App\Models\Role;
 use App\Models\Checkin;
 use App\Models\Evaluation;
+use App\Models\CounterSub; // [แก้ไข ระดับ 3 ข้อ 16] ใช้สร้างชื่อเคาน์เตอร์ (เช่น 8.1)
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -66,11 +67,16 @@ class StaffController extends Controller
             'staff_id' => 'required|string|max:255',
             'staff_name' => 'required|string|max:255',
             'staff_email' => 'required|string|max:255',
-            'staff_pincode' => 'required|string|max:255',
+            // [แก้ไข ระดับ 1 ข้อ 3] PIN ต้องเป็นตัวเลข 4 หลัก และห้ามซ้ำกับบุคลากรคนอื่น
+            // เดิม: 'staff_pincode' => 'required|string|max:255',
+            'staff_pincode' => ['required', 'digits:4', Rule::unique('staff', 'staff_pincode')],
             'password' => 'nullable|string|min:6',
             'role_id' => ['required', 'integer', Rule::exists('role', 'role_id')],
         ], [
             'password.min' => 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร',
+            // [แก้ไข ระดับ 1 ข้อ 3] ข้อความแจ้งเตือนของ PIN
+            'staff_pincode.digits' => 'PIN Code ต้องเป็นตัวเลข 4 หลัก',
+            'staff_pincode.unique' => 'PIN Code นี้ถูกใช้โดยบุคลากรคนอื่นแล้ว กรุณาเลือก PIN ใหม่',
             'role_id.required' => 'กรุณาเลือกบทบาทของบุคลากร',
             'role_id.exists' => 'ไม่พบบทบาทนี้ในระบบ กรุณารีเฟรชหน้าแล้วเลือกใหม่',
         ]);
@@ -103,7 +109,31 @@ class StaffController extends Controller
 
     public function show($id)
     {
+        // ===== [แก้ไข ระดับ 1 ข้อ 6] พนักงาน (Employee) ดูได้เฉพาะข้อมูลของตัวเองเท่านั้น =====
+        // เดิม: ไม่มีการตรวจสิทธิ์ พนักงานเปิด /staff/{id ของคนอื่น} ก็เห็นคะแนน ความคิดเห็น และประวัติของคนนั้นได้
+        // เมื่อเรียกผ่าน fetch ที่ส่ง Accept: application/json จะได้ JSON { "message": "..." } กลับไป
+        $authUser = auth()->user();
+        if ($authUser->isEmployee() && (int) $authUser->staff_id !== (int) $id) {
+            abort(403, 'คุณไม่มีสิทธิ์ดูข้อมูลของบุคลากรคนอื่น');
+        }
+        // ===== [จบ ข้อ 6] =====
+
         $staff = Staff::with('role')->findOrFail($id);
+
+        // ===== [แก้ไข ระดับ 3 ข้อ 16] ชื่อเคาน์เตอร์รูปแบบเดียวกับหน้าจัดการเคาน์เตอร์ (เช่น "เคาน์เตอร์ 8.1") =====
+        // เดิม: 'เคาน์เตอร์ 1.' . counter_sub_id — ทุกเคาน์เตอร์ขึ้นเป็น "1.x" และเลขหลังจุดเป็น ID ของทั้งระบบ
+        $subCodeMap = [];
+        foreach (CounterSub::orderBy('counter_sub_id')->get(['counter_sub_id', 'counter_id'])->groupBy('counter_id') as $counterId => $subs) {
+            foreach ($subs->values() as $i => $sub) {
+                $subCodeMap[$sub->counter_sub_id] = $counterId . '.' . ($i + 1);
+            }
+        }
+        $counterLabel = function ($schedule) use ($subCodeMap) {
+            return ($schedule && isset($subCodeMap[$schedule->counter_sub_id]))
+                ? 'เคาน์เตอร์ ' . $subCodeMap[$schedule->counter_sub_id]
+                : 'ไม่ระบุ';
+        };
+        // ===== [จบ ข้อ 16: counterLabel] =====
         
         $checkins = Checkin::with(['schedule'])->where('staff_id', $id)->orderBy('checkin_at', 'desc')->get();
         $checkinIds = $checkins->pluck('checkin_id');
@@ -111,10 +141,13 @@ class StaffController extends Controller
         $evaluations = Evaluation::whereIn('checkin_id', $checkinIds)->orderBy('evaluation_at', 'desc')->get();
 
         $activeCheckin = $checkins->whereNull('checkout_at')->first();
-        $status = $activeCheckin ? 'Check-ins' : 'Offline';
+        // [แก้ไข ระดับ 3 ข้อ 16] ใช้ค่าที่หน้าเว็บตรวจได้ตรงกัน ('Active' = กำลัง Check-in อยู่)
+        // เดิม: $status = $activeCheckin ? 'Check-ins' : 'Offline';
+        $status = $activeCheckin ? 'Active' : 'Offline';
         $loggedInStaffIds = $this->loggedInStaffIdSet();
         $accountStatus = isset($loggedInStaffIds[$staff->staff_id]) ? 'Active' : 'Inactive';
-        $currentCounter = $activeCheckin && $activeCheckin->schedule ? '1.' . $activeCheckin->schedule->counter_sub_id : '-';
+        // [แก้ไข ระดับ 3 ข้อ 16] เดิม: '1.' . $activeCheckin->schedule->counter_sub_id
+        $currentCounter = $activeCheckin && $activeCheckin->schedule ? $counterLabel($activeCheckin->schedule) : '-';
         $timeRange = $activeCheckin && $activeCheckin->schedule ? substr($activeCheckin->schedule->start_time, 0, 5) . '–' . substr($activeCheckin->schedule->end_time, 0, 5) : '-';
 
         $avgRating = $evaluations->avg('rating') ? number_format($evaluations->avg('rating'), 1) : '-';
@@ -129,21 +162,23 @@ class StaffController extends Controller
             1 => $evaluations->where('rating', 1)->count(),
         ];
 
-        $history = $checkins->take(7)->map(function($c) use ($evaluations) {
+        $history = $checkins->take(7)->map(function($c) use ($evaluations, $counterLabel) {
             $evs = $evaluations->where('checkin_id', $c->checkin_id);
             return [
                 'date' => Carbon::parse($c->checkin_at)->translatedFormat('j M.'),
-                'counter' => $c->schedule ? 'เคาน์เตอร์ 1.' . $c->schedule->counter_sub_id : 'ไม่ระบุ',
+                // [แก้ไข ระดับ 3 ข้อ 16] เดิม: 'เคาน์เตอร์ 1.' . $c->schedule->counter_sub_id
+                'counter' => $counterLabel($c->schedule),
                 'time' => $c->schedule ? substr($c->schedule->start_time, 0, 5) . '-' . substr($c->schedule->end_time, 0, 5) . ' น.' : '-',
                 'avg' => $evs->avg('rating') ? number_format($evs->avg('rating'), 1) : '-',
                 'count' => $evs->count()
             ];
         });
 
-        $comments = $evaluations->whereNotNull('comment')->where('comment', '!=', '')->take(10)->map(function($e) use ($checkins) {
+        $comments = $evaluations->whereNotNull('comment')->where('comment', '!=', '')->take(10)->map(function($e) use ($checkins, $counterLabel) {
             $c = $checkins->where('checkin_id', $e->checkin_id)->first();
             return [
-                'counter' => $c && $c->schedule ? 'เคาน์เตอร์ 1.' . $c->schedule->counter_sub_id : 'ไม่ระบุ',
+                // [แก้ไข ระดับ 3 ข้อ 16] เดิม: 'เคาน์เตอร์ 1.' . $c->schedule->counter_sub_id
+                'counter' => $c ? $counterLabel($c->schedule) : 'ไม่ระบุ',
                 'time' => Carbon::parse($e->evaluation_at)->format('H:i น.'),
                 'text' => $e->comment,
                 'rating' => $e->rating
@@ -164,7 +199,9 @@ class StaffController extends Controller
             'current_counter' => $currentCounter,
             'time_range' => $timeRange,
             'rating_counts' => $ratingCounts,
-            'total_evals' => $totalEvals > 0 ? $totalEvals : 1, 
+            // [แก้ไข ระดับ 3 ข้อ 16] ส่งจำนวนจริง (หน้าเว็บกันหารศูนย์ไว้แล้ว)
+            // เดิม: $totalEvals > 0 ? $totalEvals : 1 — คนที่ยังไม่มีการประเมินจะแสดงเป็น 1 รายการ
+            'total_evals' => $totalEvals,
             'history' => $history,
             'comments' => $comments
         ]);
@@ -568,15 +605,21 @@ class StaffController extends Controller
                 }
             }
 
-            // จัดการ PIN Code (ต้องเป็นตัวเลข 4 หลัก)
+            // ===== [แก้ไข ระดับ 1 ข้อ 3] จัดการ PIN Code (ต้องเป็นตัวเลข 4 หลัก และห้ามซ้ำกับคนอื่น) =====
+            // เดิม: ถ้า PIN ไม่ครบ 4 หลักจะใช้ PIN เดิมหรือสุ่มด้วย rand() โดยไม่ตรวจซ้ำ
+            //       และถ้า PIN ในไฟล์ซ้ำกับคนอื่นก็บันทึกไปเลย ทำให้ Check-in ผิดคนได้
             $cleanPin = preg_replace('/[^0-9]/', '', $staffPincode);
             if (strlen($cleanPin) !== 4) {
-                if ($staff && !empty($staff->staff_pincode)) {
-                    $cleanPin = $staff->staff_pincode;
-                } else {
-                    $cleanPin = str_pad((string) rand(0, 9999), 4, '0', STR_PAD_LEFT);
-                }
+                $cleanPin = ($staff && !empty($staff->staff_pincode))
+                    ? (string) $staff->staff_pincode
+                    : Staff::generateUniquePin();
             }
+            if (Staff::pinTakenByOther($cleanPin, $staff?->staff_id)) {
+                $newPin = Staff::generateUniquePin();
+                $errors[] = "แถวที่ {$rowNum}: PIN {$cleanPin} ซ้ำกับบุคลากรคนอื่น ระบบสุ่ม PIN ใหม่ให้เป็น {$newPin} (นำเข้าสำเร็จ)";
+                $cleanPin = $newPin;
+            }
+            // ===== [จบ ข้อ 3: PIN ตอน Import] =====
 
             // ตรวจสอบความยาว Password (หากมีการระบุ และไม่ใช่ Bcrypt Hash)
             if (!empty($passwordRaw) && !str_starts_with($passwordRaw, '$2y$') && !str_starts_with($passwordRaw, '$2a$')) {
@@ -847,13 +890,31 @@ class StaffController extends Controller
 
     public function resetAllPins(Request $request)
     {
-        $staffs = Staff::all();
-        foreach ($staffs as $staff) {
-            $newPin = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $staff->staff_pincode = $newPin;
-            $staff->save();
-        }
-        return redirect()->route('staff.index')->with('success', 'Reset PIN Code ทั้งหมดสำเร็จ');
+        // ===== [แก้ไข ระดับ 1 ข้อ 3] สุ่ม PIN ใหม่ทั้งชุดแบบไม่ซ้ำกันเลย =====
+        // เดิม: วนสุ่มด้วย rand() ทีละคนโดยไม่ตรวจซ้ำ ยิ่งคนเยอะยิ่งมี PIN ชนกัน
+        // ใหม่: สุ่มสลับเลข 0000–9999 แล้วหยิบตามจำนวนคน จึงไม่ซ้ำแน่นอน
+        DB::transaction(function () {
+            $staffIds = Staff::lockForUpdate()->pluck('staff_id')->values();
+
+            if ($staffIds->count() > 10000) {
+                throw new \RuntimeException('จำนวนบุคลากรเกินจำนวน PIN 4 หลักที่เป็นไปได้');
+            }
+
+            $pins = collect(range(0, 9999))->shuffle()->take($staffIds->count())->values();
+
+            // ใส่ค่าชั่วคราวที่ไม่ซ้ำก่อน เพื่อไม่ให้ชน unique index ระหว่างสลับ PIN
+            Staff::query()->update(['staff_pincode' => DB::raw("CONCAT('tmp-', staff_id)")]);
+
+            foreach ($staffIds as $i => $staffId) {
+                Staff::where('staff_id', $staffId)->update([
+                    'staff_pincode' => str_pad((string) $pins[$i], 4, '0', STR_PAD_LEFT),
+                ]);
+            }
+        });
+
+        // เดิม: 'Reset PIN Code ทั้งหมดสำเร็จ' — แต่ระบบยังไม่ได้ส่งอีเมล แจ้งให้แอดมินรู้ตามจริง
+        return redirect()->route('staff.index')->with('success', 'Reset PIN Code ทั้งหมดสำเร็จ — ระบบยังไม่ได้ส่ง PIN ทางอีเมล กรุณาแจ้ง PIN ใหม่ให้บุคลากร (ดูได้ในตารางหรือ Export CSV)');
+        // ===== [จบ ข้อ 3: resetAllPins] =====
     }
 
     /**

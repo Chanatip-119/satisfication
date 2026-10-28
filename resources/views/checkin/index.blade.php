@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Check-in</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/checkin.css') }}">
+    {{-- [แก้ไข ระดับ 3 ข้อ 17] เพิ่ม ?v= ให้แท็บเล็ตโหลด CSS ใหม่ทุกครั้งที่ไฟล์เปลี่ยน
+         เดิม: <link rel="stylesheet" href="{{ asset('css/checkin.css') }}"> (แท็บเล็ตอาจค้าง CSS เก่าใน cache) --}}
+    <link rel="stylesheet" href="{{ asset('css/checkin.css') }}?v={{ filemtime(public_path('css/checkin.css')) }}">
 </head>
 <body>
 
@@ -31,6 +33,13 @@
             <div class="step {{ $step >= 4 ? ($step > 4 ? 'completed' : 'active') : '' }}">4</div>
         </div>
 
+        @if($errors->any())
+        <div class="alert-box" role="alert">
+            <div class="alert-title">ไม่สามารถ Check-in ได้</div>
+            <div class="alert-text">{{ $errors->first() }}</div>
+        </div>
+        @endif
+
         @if($step == 1)
         <form action="{{ route('checkin.step1') }}" method="POST">
             @csrf
@@ -44,7 +53,7 @@
                     <?php if($c->is_available): ?>
                         <div class="status available">ว่าง</div>
                     <?php else: ?>
-                        <div class="status occupied">มีบุคลากรอยู่แล้ว</div>
+                        <div class="status occupied">มีคนอยู่ — เลือกเพื่อ Check-in แทน</div>
                     <?php endif; ?>
                 </label>
                 <?php endforeach; ?>
@@ -320,20 +329,32 @@
     }
 
     (function () {
-        // บล็อกไม่ให้สคริปต์หน้าบ้านพ่น error เวลา fetch
-        const originalFetch = window.fetch;
-        window.fetch = function (url, options) {
-            if (typeof url === 'string' && url.includes('/api/my-reviews')) {
-                return new Promise(() => {}); 
-            }
-            return originalFetch.apply(this, arguments);
-        };
+        // ===== [แก้ไข ระดับ 3 ข้อ 17] เปลี่ยนวิธีเช็คสถานะให้เบาลง =====
+        // เดิม: ทุก 4 วินาที ดึงหน้า /checkin ทั้งหน้าซ้ำ ซึ่งทุกครั้งเซิร์ฟเวอร์ต้อง
+        //       วน checkout อัตโนมัติทุกคน + สแกนกะทั้งระบบ + โหลดคะแนนทั้งหมดของพนักงาน
+        //       (10 จุดเปิดพร้อมกัน ≈ 9,000 ครั้งต่อชั่วโมง)
+        // ใหม่: ทุก 10 วินาที เรียก /checkin/status ที่ตอบกลับเป็น JSON เล็ก ๆ
+        //       (ยังเปิดอยู่ไหม / จำนวนรีวิว / แถบเตือน 15 นาที)
+        //       แล้วค่อยดึงหน้าเต็มมาอัปเดต "เฉพาะตอนที่มีอะไรเปลี่ยน" เท่านั้น
+        //
+        // [แก้ไข ระดับ 3 ข้อ 17] ลบโค้ดที่ override window.fetch เพื่อดัก /api/my-reviews ออก
+        // เดิม: ทำให้ทุกคำขอไป /api/my-reviews ค้างตลอดไป เพื่อซ่อน error จากสคริปต์เก่า (route นี้ไม่มีในระบบแล้ว)
 
-        // อัปเดตรีวิวและเวลาแบบเรียลไทม์
-        function pollLatestReviews() {
-            if (!window.location.search.includes('active_checkin_id')) return;
+        const statusUrl = "{{ route('checkin.status') }}";
+        const homeUrl = "{{ route('checkin.index') }}";
 
-            originalFetch(window.location.href, {
+        function readText(id) {
+            const el = document.getElementById(id);
+            return el ? el.innerText.trim() : '';
+        }
+
+        // ค่าเริ่มต้นจากหน้าที่โหลดมา ใช้เทียบว่ามีอะไรเปลี่ยนหรือไม่
+        let lastSignature = readText('stat-total-val') + '|' + readText('stat-neg-val') + '|'
+            + (document.querySelector('.notification-bar') ? '1' : '0');
+
+        // ดึงหน้าเต็มมาอัปเดตส่วนที่เปลี่ยน (โค้ดเดิมจาก pollLatestReviews แต่ถูกเรียกเฉพาะตอนจำเป็น)
+        function refreshFromServer() {
+            fetch(window.location.href, {
                 method: 'GET',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 cache: 'no-store'
@@ -350,7 +371,7 @@
 
                 // ถ้าไม่มีเครื่องหมายถูกสีเขียว = หมดเวลาโดนเตะออกแล้ว ให้เด้งกลับหน้าแรกทันที
                 if (!doc.querySelector('.success-icon')) {
-                    window.location.replace("{{ url('/checkin') }}");
+                    window.location.replace(homeUrl);
                     return;
                 }
 
@@ -366,42 +387,59 @@
                     currentNotifBar.innerHTML = newNotifBar.innerHTML;
                 }
 
-                // 2. เช็คว่ามีรีวิวใหม่เข้ามาไหม (ดูจากกล่องตัวเลข)
-                let newTotal = doc.getElementById('stat-total-val') ? doc.getElementById('stat-total-val').innerText : '';
-                let currentTotal = document.getElementById('stat-total-val') ? document.getElementById('stat-total-val').innerText : '';
-                let newNeg = doc.getElementById('stat-neg-val') ? doc.getElementById('stat-neg-val').innerText : '';
-                let currentNeg = document.getElementById('stat-neg-val') ? document.getElementById('stat-neg-val').innerText : '';
-
-                // ถ้ารีวิวมีเพิ่ม/ลด ค่อยอัปเดตกล่องคอมเมนต์
-                if (newTotal !== currentTotal || newNeg !== currentNeg) {
-                    
-                    // อัปเดตตัวเลขทุกจุดบนหน้าจอ
-                    const idsToUpdate = [
-                        'stat-avg-val', 'stat-total-val', 'stat-neg-val',
-                        'filter-total-count', 'filter-neg-count',
-                        'header-total-count', 'header-avg-val'
-                    ];
-                    
-                    idsToUpdate.forEach(id => {
-                        if (doc.getElementById(id) && document.getElementById(id)) {
-                            document.getElementById(id).innerText = doc.getElementById(id).innerText;
-                        }
-                    });
-
-                    // อัปเดตกล่องคอมเมนต์ด้านล่าง
-                    let newList = doc.getElementById('review-list-container');
-                    let curList = document.getElementById('review-list-container');
-                    if (newList && curList) {
-                        curList.innerHTML = newList.innerHTML;
-                        filterReviews(currentFilter); // ให้ค้างแท็บเดิมและคงสีปุ่มที่พนักงานกำลังกดดูอยู่
+                // 2. อัปเดตตัวเลขทุกจุดบนหน้าจอ
+                // [แก้ไข ระดับ 3 ข้อ 17] แก้ id ที่พิมพ์ผิด
+                // เดิม: 'filter-total-count' (ไม่มี element นี้) ทำให้ตัวเลขบนปุ่ม "ทั้งหมด (n)" ไม่อัปเดตเลย
+                const idsToUpdate = [
+                    'stat-avg-val', 'stat-total-val', 'stat-neg-val',
+                    'filter-all-count', 'filter-neg-count',
+                    'header-total-count', 'header-avg-val'
+                ];
+                
+                idsToUpdate.forEach(id => {
+                    if (doc.getElementById(id) && document.getElementById(id)) {
+                        document.getElementById(id).innerText = doc.getElementById(id).innerText;
                     }
+                });
+
+                // 3. อัปเดตกล่องคอมเมนต์ด้านล่าง
+                let newList = doc.getElementById('review-list-container');
+                let curList = document.getElementById('review-list-container');
+                if (newList && curList) {
+                    curList.innerHTML = newList.innerHTML;
+                    filterReviews(currentFilter); // ให้ค้างแท็บเดิมและคงสีปุ่มที่พนักงานกำลังกดดูอยู่
                 }
             })
             .catch(() => {});
         }
 
-        // ตั้งเวลาเช็คพื้นหลังทุก 4 วินาที
-        setInterval(pollLatestReviews, 4000);
+        // เช็คสถานะแบบเบา
+        function pollStatus() {
+            fetch(statusUrl, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                cache: 'no-store'
+            })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (!data) return;
+
+                // หมดเวลากะ หรือถูกคนอื่น Check-in รับช่วงต่อ → กลับหน้าแรก
+                if (!data.active) {
+                    window.location.replace(homeUrl);
+                    return;
+                }
+
+                const signature = data.total + '|' + data.negative + '|' + (data.warning ? '1' : '0');
+                if (signature !== lastSignature) {
+                    lastSignature = signature;
+                    refreshFromServer();
+                }
+            })
+            .catch(() => {});
+        }
+
+        setInterval(pollStatus, 10000);
+        // ===== [จบ ข้อ 17] =====
     })();
 </script>
     @endif

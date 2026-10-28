@@ -23,8 +23,10 @@
         <a href="{{ route('counter.index') }}" class="menu-item {{ Route::is('counter.*') ? 'active' : '' }}">เคาน์เตอร์</a>
         <a href="{{ route('staff.index') }}" class="menu-item {{ Route::is('staff.*') ? 'active' : '' }}">บุคลากร</a>
         <a href="{{ url('/qrcode') }}" class="menu-item {{ request()->is('/qrcode') ? 'active' : '' }}">QR Code</a>
+        @unless($isEmployee)
         <div class="menu-category">ระบบ</div>
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
+        @endunless
         <div class="user-profile-container">
             <div class="profile-dropdown-menu" id="profileDropdown">
                 <a href="#" class="dropdown-item text-danger" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
@@ -110,8 +112,6 @@
         <div class="status-legend-row">
             <div class="legend-item"><span class="legend-box checkin"></span> Check-in อยู่</div>
             <div class="legend-item"><span class="legend-box waiting"></span> มีตาราง รอ Check-in</div>
-            <div class="legend-item"><span class="legend-box sick"></span> ลาป่วย/ไม่มา</div>
-            <div class="legend-item"><span class="legend-box sub"></span> มีคนแทน (Substitute)</div>
             <div class="legend-item"><span class="legend-box close"></span> ปิด/สิ้นสุดเวลา</div>
         </div>
 
@@ -133,27 +133,18 @@
                             <?php foreach($weekDays as $day): ?>
                                 <td>
                                     <?php 
-                                    $primaryIds = isset($filteredSchedulesCollection) ? $filteredSchedulesCollection->pluck('schedule_id')->toArray() : [];
                                     foreach($counter->countersubs as $sub): 
                                         foreach($sub->schedules as $sch): 
-                                            $isPrimary = empty($primaryIds) ? true : in_array($sch->schedule_id, $primaryIds);
-                                            if($sch->schedule_date == $day->format('Y-m-d') && $isPrimary):
+                                            if($sch->schedule_date == $day->format('Y-m-d')):
                                                 $rawStatus = strtolower($sch->status ?? 'empty');
-                                                $subArray = isset($substitutesData[$sch->schedule_id]) ? json_decode($substitutesData[$sch->schedule_id], true) : [];
-                                                $hasSubs = !empty($subArray);
                                                 
                                                 $slotEndDT = \Carbon\Carbon::parse($sch->schedule_date . ' ' . $sch->end_time);
                                                 $isPastSlot = \Carbon\Carbon::now()->gt($slotEndDT);
 
                                                 $cardClass = 'waiting-card';
                                                 $timeClass = 'waiting-text';
-                                                $nameClass = '';
 
-                                                if ($rawStatus === 'sick') {
-                                                    $cardClass = $hasSubs ? 'sub-card' : 'sick-card';
-                                                    $timeClass = 'sick-text';
-                                                    $nameClass = 'sick-line';
-                                                } elseif ($rawStatus === 'checkin') {
+                                                if ($rawStatus === 'checkin') {
                                                     $cardClass = 'checkin-card';
                                                     $timeClass = '';
                                                 } elseif ($rawStatus === 'close' || $isPastSlot) {
@@ -163,14 +154,9 @@
                                     ?>
                                                 @if(!empty($sch->staff_id) && $sch->staff_id > 0 && !empty($sch->staff) && !empty($sch->staff->staff_name))
                                                 <div class="schedule-card {{ $cardClass }}"
-                                                @unless($isEmployee)onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", {!! $substitutesData[$sch->schedule_id] ?? "[]" !!}, "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}")'@endunless>
+                                                @unless($isEmployee)onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}", {{ (int) ($sch->checkins_count ?? 0) }})'@endunless>
                                                     <div class="sch-time {{ $timeClass }}">{{ substr($sch->start_time,0,5) }} - {{ substr($sch->end_time,0,5) }}</div>
-                                                    <div class="sch-name {{ $nameClass }}">{{ $sch->staff->staff_name ?? 'ไม่ระบุชื่อ' }}</div>
-                                                    <?php if($hasSubs): ?>
-                                                        <div style="font-size: 11px; color: #6b46c1; font-weight: 600; margin-top: 3px;">
-                                                            <i class="fas fa-user-shield"></i> แทนโดย: {{ collect($subArray)->pluck('name')->implode(', ') }}
-                                                        </div>
-                                                    <?php endif; ?>
+                                                    <div class="sch-name">{{ $sch->staff->staff_name ?? 'ไม่ระบุชื่อ' }}</div>
                                                 </div>
                                                 @endif
                                     <?php 
@@ -455,27 +441,6 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label" style="font-size: 14px; display: flex; align-items: center; gap: 8px;">
-                            บุคลากรสำรอง (Substitute) <span style="background: #faf5ff; color: #805ad5; font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #d6bcfa;">ไม่บังคับ — เพิ่มทีหลังได้</span>
-                        </label>
-                        <select name="substitute_staff_id" id="add_sub_staff" class="form-control" style="font-weight: 500;" onchange="validateAddScheduleConflicts()">
-                            <option value="">— ไม่กำหนดสำรอง —</option>
-                            <?php foreach($staffs as $staff): ?>
-                                <option value="{{ $staff->staff_id }}">{{ $staff->staff_name }} (BUU-{{ str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT) }})</option>
-                            <?php endforeach; ?>
-                        </select>
-
-                        <div id="subConflictAlert" class="conflict-alert-box">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <div id="subConflictText"></div>
-                        </div>
-
-                        <div class="field-hint">
-                            <i class="far fa-star" style="color: #a0aec0;"></i> ถ้ากำหนดไว้ล่วงหน้า เมื่อคนหลักลา &#8594; เรียกคนสำรองเข้าแทนได้ทันที
-                        </div>
-                    </div>
-
                     <div id="bottomConflictBanner" class="conflict-bottom-banner">
                         <i class="fas fa-exclamation-triangle"></i>
                         <span id="bottomConflictText"></span>
@@ -490,7 +455,7 @@
         </div>
     </div>
 
-    <!-- Modal: จัดการตาราง (Edit / Substitute / History) -->
+    <!-- Modal: จัดการตาราง (Edit / History) -->
     <div id="complexEditModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 550px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
@@ -503,8 +468,7 @@
 
             <div class="modal-tabs-header">
                 <div class="m-tab active" onclick="switchEditTab(1)">ข้อมูล Slot</div>
-                <div class="m-tab" onclick="switchEditTab(2)">คนแทน / ลาป่วย</div>
-                <div class="m-tab" onclick="switchEditTab(3)">ประวัติ</div>
+                <div class="m-tab" onclick="switchEditTab(2)">ประวัติ</div>
             </div>
 
             <div id="eTab1" class="m-tab-content active">
@@ -548,68 +512,15 @@
                         <i class="far fa-trash-alt"></i>
                     </button>
                 </form>
+
+                {{-- [เพิ่มใหม่ ระดับ 2 ข้อ 10] แสดงแทนปุ่มลบ เมื่อกะนี้มีประวัติ Check-in แล้ว --}}
+                <div id="cDeleteLocked" style="display: none; margin-top: 20px; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 15px; font-size: 13px; color: #4a5568; line-height: 1.6;">
+                    <i class="fas fa-lock" style="margin-right: 6px; color: #a0aec0;"></i>
+                    <span id="cDeleteLockedText"></span>
+                </div>
             </div>
             
             <div id="eTab2" class="m-tab-content">
-                <div class="sick-alert-box">
-                    <h4 style="color: #e53e3e; margin-bottom: 8px; font-size: 15px; font-weight: 700;">บุคลากรหลักไม่สามารถมาได้?</h4>
-                    <button type="button" id="btnToggleSick" class="btn-toggle-sick" onclick="toggleSick()">ทำเครื่องหมาย "ลาป่วย / ไม่มา"</button>
-                </div>
-
-                <div id="substitutesListContainer">
-                    <div style="font-weight: 700; font-size: 14px; color: #1a202c; margin-bottom: 15px;">คนแทนที่ Assign แล้ว ( <span id="subCount">0</span> )</div>
-                    <div id="subsListHtml"></div>
-                    <div style="border-top: 1px dashed #cbd5e0; margin: 25px 0;"></div>
-
-                    <div style="font-weight: 700; font-size: 14px; color: #1a202c; margin-bottom: 15px; display: flex; align-items: center;"><i class="fas fa-user-plus" style="color: #805ad5; margin-right: 8px;"></i> เพิ่มคนแทนอีกคน</div>
-                    
-                    <div class="suggested-sub-card" id="suggestedSubCard" style="display: none;">
-                        <div>
-                            <div style="font-weight: 700; color: #1a202c; font-size: 14px;" id="suggestedSubName">นาย ... (BUU-...)</div>
-                            <div style="font-size: 12px; color: #6b46c1; margin-top: 2px;">บุคลากรสำรองที่กำหนดล่วงหน้า - ว่างช่วงนี้ <i class="fas fa-check"></i></div>
-                        </div>
-                        <button type="button" class="btn-call-sub" onclick="selectSuggestedSub()">เรียก</button>
-                    </div>
-
-                    <form action="{{ route('schedule.store') }}" method="POST">
-                        @csrf
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label class="form-label">เลือกคนแทน</label>
-                            <select name="staff_id" id="subSelectBox" class="form-control" required onchange="validateEditSubConflict()">
-                                <option value="">— เลือกบุคลากร —</option>
-                                <?php foreach($staffs as $staff): ?>
-                                    <option value="{{ $staff->staff_id }}">{{ $staff->staff_name }} (BUU-{{ str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT) }})</option>
-                                <?php endforeach; ?>
-                            </select>
-                            <div id="editSubConflictAlert" class="conflict-alert-box">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <div id="editSubConflictText"></div>
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 20px; margin-bottom: 15px;">
-                            <div class="form-group" style="flex: 1; margin: 0;"><label class="form-label">เริ่มแทน</label><input type="time" name="start_time" id="new_sub_start" class="form-control" required onchange="validateEditSubConflict()"></div>
-                            <div class="form-group" style="flex: 1; margin: 0;"><label class="form-label">ถึงเวลา</label><input type="time" name="end_time" id="new_sub_end" class="form-control" required onchange="validateEditSubConflict()"></div>
-                        </div>
-                        <input type="hidden" name="counter_sub_id" id="new_sub_counter">
-                        <input type="hidden" name="schedule_date" id="new_sub_date">
-                        <input type="hidden" name="status" value="empty">
-                        <button type="submit" id="btnSubmitEditSub" class="btn btn-yellow" style="width: 100%; justify-content: center; padding: 12px 0;">ยืนยัน Assign คนแทน</button>
-                    </form>
-                </div>
-
-                <form id="sickUpdateForm" method="POST" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    @csrf
-                    <input type="hidden" name="staff_id" id="s_edit_staff">
-                    <input type="hidden" name="schedule_date" id="s_edit_date">
-                    <input type="hidden" name="start_time" id="s_edit_start">
-                    <input type="hidden" name="end_time" id="s_edit_end">
-                    <input type="hidden" name="status" id="s_edit_status" value="sick">
-                    <button type="button" class="btn btn-outline" onclick="closeModal('complexEditModal')">ยกเลิก</button>
-                    <button type="submit" class="btn btn-yellow">บันทึก</button>
-                </form>
-            </div>
-
-            <div id="eTab3" class="m-tab-content">
                 <div id="historyTimelineContainer">
                     <div style="color: #718096; font-size: 14px; text-align: center; margin-top: 30px;">ยังไม่มีประวัติการเปลี่ยนแปลง</div>
                 </div>
@@ -857,10 +768,8 @@
 
         function clearAddConflictAlerts() {
             document.getElementById('primaryConflictAlert').style.display = 'none';
-            document.getElementById('subConflictAlert').style.display = 'none';
             document.getElementById('bottomConflictBanner').style.display = 'none';
             document.getElementById('add_primary_staff').style.borderColor = '#cbd5e0';
-            document.getElementById('add_sub_staff').style.borderColor = '#cbd5e0';
             document.getElementById('btnSubmitAddSchedule').disabled = false;
         }
 
@@ -868,7 +777,6 @@
             clearAddConflictAlerts();
 
             let primaryId = document.getElementById('add_primary_staff').value;
-            let subId = document.getElementById('add_sub_staff').value;
             let startTime = document.getElementById('add_start_time').value;
             let endTime = document.getElementById('add_end_time').value;
             let targetDates = getTargetScheduleDates();
@@ -888,57 +796,10 @@
                 }
             }
 
-            if (subId) {
-                if (primaryId && subId === primaryId) {
-                    hasConflict = true;
-                    document.getElementById('subConflictAlert').style.display = 'flex';
-                    document.getElementById('subConflictText').innerHTML = 
-                        `<strong>Conflict! บุคลากรสำรองต้องไม่ใช่คนเดียวกับบุคลากรหลัก</strong><br>— กรุณาเลือกบุคลากรสำรองคนอื่น`;
-                    document.getElementById('add_sub_staff').style.borderColor = '#fc8181';
-                    if (!bannerMessage) bannerMessage = `Conflict: บุคลากรสำรองซ้ำกับบุคลากรหลัก`;
-                } else {
-                    let sConflict = findStaffConflict(subId, targetDates, startTime, endTime);
-                    if (sConflict) {
-                        hasConflict = true;
-                        document.getElementById('subConflictAlert').style.display = 'flex';
-                        document.getElementById('subConflictText').innerHTML = 
-                            `<strong>Conflict! ${sConflict.staffName} มี slot ที่เคาน์เตอร์ ${sConflict.counterId} ช่วงเวลาเดียวกัน (${sConflict.start}–${sConflict.end})</strong><br>— กรุณาเปลี่ยนเวลาหรือเลือกคนสำรองอื่น`;
-                        document.getElementById('add_sub_staff').style.borderColor = '#fc8181';
-                        if (!bannerMessage) bannerMessage = `Conflict: ${sConflict.staffName} มี slot ซ้อนทับช่วงเวลาเดียวกันที่เคาน์เตอร์ ${sConflict.counterId}`;
-                    }
-                }
-            }
-
             if (hasConflict) {
                 document.getElementById('bottomConflictBanner').style.display = 'flex';
                 document.getElementById('bottomConflictText').innerText = bannerMessage;
                 document.getElementById('btnSubmitAddSchedule').disabled = true;
-            }
-        }
-
-        function validateEditSubConflict() {
-            let subId = document.getElementById('subSelectBox').value;
-            let dateVal = document.getElementById('new_sub_date').value;
-            let startVal = document.getElementById('new_sub_start').value;
-            let endVal = document.getElementById('new_sub_end').value;
-
-            let alertBox = document.getElementById('editSubConflictAlert');
-            let alertText = document.getElementById('editSubConflictText');
-            let btnSubmit = document.getElementById('btnSubmitEditSub');
-            let selectBox = document.getElementById('subSelectBox');
-
-            alertBox.style.display = 'none';
-            selectBox.style.borderColor = '#cbd5e0';
-            btnSubmit.disabled = false;
-
-            if (!subId || !dateVal || !startVal || !endVal) return;
-
-            let conflict = findStaffConflict(subId, [dateVal], startVal, endVal);
-            if (conflict) {
-                alertBox.style.display = 'flex';
-                alertText.innerHTML = `<strong>Conflict! ${conflict.staffName} มี slot ที่เคาน์เตอร์ ${conflict.counterId} ช่วงเวลาเดียวกัน (${conflict.start}–${conflict.end})</strong><br>— ไม่สามารถเพิ่มเป็นคนแทนในเวลานี้ได้`;
-                selectBox.style.borderColor = '#fc8181';
-                btnSubmit.disabled = true;
             }
         }
 
@@ -949,36 +810,8 @@
             document.getElementById('eTab' + tabNum).classList.add('active');
         }
 
-        function selectSuggestedSub() {
-            let sid = document.getElementById('suggestedSubCard').dataset.staffId;
-            let selectBox = document.getElementById('subSelectBox');
-            selectBox.value = sid;
-            validateEditSubConflict();
-            
-            selectBox.style.borderColor = '#8b5cf6';
-            selectBox.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.2)';
-            setTimeout(() => {
-                selectBox.style.borderColor = '#cbd5e0';
-                selectBox.style.boxShadow = 'none';
-            }, 1000);
-        }
-
-        function toggleSick() {
-            let btn = document.getElementById('btnToggleSick');
-            let statusInput = document.getElementById('s_edit_status');
-
-            if (statusInput.value.toLowerCase() !== 'sick') {
-                btn.classList.add('active');
-                btn.innerText = 'ยกเลิกการลาป่วย (กลับมาทำงาน)';
-                statusInput.value = 'sick';
-            } else {
-                btn.classList.remove('active');
-                btn.innerText = 'ทำเครื่องหมาย "ลาป่วย / ไม่มา"';
-                statusInput.value = 'empty';
-            }
-        }
-
-        function openComplexEditModal(schId, counterId, counterSubId, dayName, start, end, date, staffName, staffId, status, substitutes, createdAt, updatedAt) {
+        // [แก้ไข ระดับ 2 ข้อ 10] เพิ่มพารามิเตอร์ checkinCount (จำนวนครั้งที่มีคน Check-in ในกะนี้)
+        function openComplexEditModal(schId, counterId, counterSubId, dayName, start, end, date, staffName, staffId, status, createdAt, updatedAt, checkinCount = 0) {
             let startShort = start.substring(0, 5);
             let endShort = end.substring(0, 5);
             let normStatus = (status || 'empty').toLowerCase();
@@ -995,12 +828,7 @@
             let now = new Date();
             let slotEnd = new Date(date + 'T' + endShort + ':00');
 
-            if (normStatus === 'sick') {
-                statusEl.innerText = 'ลาป่วย / ไม่มา';
-                statusEl.style.color = '#e53e3e';
-                cardBox.style.background = '#fff5f5';
-                cardBox.style.borderColor = '#feb2b2';
-            } else if (normStatus === 'checkin') {
+            if (normStatus === 'checkin') {
                 statusEl.innerText = 'Check-in อยู่';
                 statusEl.style.color = '#38a169';
                 cardBox.style.background = '#f0fff4';
@@ -1032,74 +860,20 @@
             document.getElementById('complexEditForm').action = "/schedule/update/" + schId;
             document.getElementById('cDeleteForm').action = "/schedule/delete/" + schId;
 
-            document.getElementById('sickUpdateForm').action = "/schedule/update/" + schId;
-            document.getElementById('s_edit_staff').value = staffId;
-            document.getElementById('s_edit_date').value = date;
-            document.getElementById('s_edit_start').value = startShort;
-            document.getElementById('s_edit_end').value = endShort;
-
-            document.getElementById('new_sub_counter').value = counterSubId;
-            document.getElementById('new_sub_date').value = date;
-            document.getElementById('new_sub_start').value = startShort;
-            document.getElementById('new_sub_end').value = endShort;
-            document.getElementById('subSelectBox').value = ""; 
-            validateEditSubConflict();
-
-            let btnSick = document.getElementById('btnToggleSick');
-            
-            if(normStatus === 'sick') {
-                btnSick.classList.add('active');
-                btnSick.innerText = 'ยกเลิกการลาป่วย (กลับมาทำงาน)';
-                document.getElementById('s_edit_status').value = 'sick'; 
+            // ===== [เพิ่มใหม่ ระดับ 2 ข้อ 10] ซ่อนปุ่มลบถ้ากะนี้มีประวัติ Check-in แล้ว =====
+            // (Controller ตรวจซ้ำอีกชั้น ส่วนนี้แค่บอกผู้ใช้ล่วงหน้าว่าทำไมลบไม่ได้)
+            const deleteForm = document.getElementById('cDeleteForm');
+            const deleteLocked = document.getElementById('cDeleteLocked');
+            if (checkinCount > 0) {
+                deleteForm.style.display = 'none';
+                deleteLocked.style.display = 'block';
+                document.getElementById('cDeleteLockedText').innerText =
+                    'ลบ Slot นี้ไม่ได้ เพราะมีประวัติ Check-in ' + checkinCount + ' ครั้ง หากต้องการเปลี่ยนแปลง ให้แก้ไขเวลาแทน';
             } else {
-                btnSick.classList.remove('active');
-                btnSick.innerText = 'ทำเครื่องหมาย "ลาป่วย / ไม่มา"';
-                document.getElementById('s_edit_status').value = 'empty';
+                deleteForm.style.display = 'block';
+                deleteLocked.style.display = 'none';
             }
-
-            let subHtml = '';
-            document.getElementById('subCount').innerText = substitutes.length;
-            
-            if(substitutes.length > 0) {
-                substitutes.forEach(sub => {
-                    subHtml += `
-                        <div class="substitute-card">
-                            <div>
-                                <div style="font-weight: 700; color: #1a202c; font-size: 14px;">นาย ${sub.name} (BUU-${String(sub.staff_code).padStart(3, '0')})</div>
-                                <div style="font-size: 12px; color: #6b46c1; margin-top: 4px; font-weight: 600;">คุมช่วง ${sub.start}–${sub.end}</div>
-                            </div>
-                            <form action="/schedule/delete/${sub.id}" method="POST" style="margin:0;">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" style="background: white; border: 1px solid #e2e8f0; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #a0aec0;" onclick="return confirm('ลบคนแทนคนนี้ออกหรือไม่?')"><i class="fas fa-times"></i></button>
-                            </form>
-                        </div>
-                    `;
-                });
-            } else {
-                subHtml = '<div style="font-size: 13px; color: #a0aec0; text-align: center; margin-bottom: 15px;">ยังไม่ได้ Assign คนแทน</div>';
-            }
-            document.getElementById('subsListHtml').innerHTML = subHtml;
-
-            let suggestedStaff = allStaffsList.find(s => {
-                if (s.id === staffId || substitutes.some(sub => sub.staff_code === s.id)) return false;
-                
-                let isBusy = s.schedules.some(sch => {
-                    if (sch.date !== date) return false;
-                    return (sch.start < endShort && sch.end > startShort);
-                });
-                
-                return !isBusy;
-            });
-
-            let suggestCard = document.getElementById('suggestedSubCard');
-            if(suggestedStaff) {
-                suggestCard.style.display = 'flex';
-                document.getElementById('suggestedSubName').innerText = suggestedStaff.name + ' (BUU-' + String(suggestedStaff.id).padStart(3, '0') + ')';
-                suggestCard.dataset.staffId = suggestedStaff.id; 
-            } else {
-                suggestCard.style.display = 'none';
-            }
+            // ===== [จบ ข้อ 10] =====
 
             let historyHtml = '<div class="history-list">';
             let hasHistory = false;
@@ -1114,14 +888,6 @@
                 hasHistory = true;
             }
 
-            if(substitutes && substitutes.length > 0) {
-                substitutes.forEach(sub => {
-                    let subTime = sub.created_at || 'ไม่ระบุเวลา';
-                    historyHtml += `<div class="h-item"><div class="h-dot sub"></div><div><div class="h-time">${subTime}</div><div class="h-text" style="color:#805ad5;">Assign คนแทน: นาย ${sub.name}</div></div></div>`;
-                    hasHistory = true;
-                });
-            }
-            
             historyHtml += '</div>';
 
             if(!hasHistory) {

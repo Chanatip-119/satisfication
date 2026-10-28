@@ -47,7 +47,25 @@
                 <h1>ประเมินความพึงพอใจ</h1>
                 <p class="subtitle">คุณพึงพอใจกับการบริการมากน้อยเพียงใด?</p>
 
-                <form action="{{ route('evaluation.store') }}" method="POST">
+                {{-- ===== [แก้ไข ระดับ 1 ข้อ 4] แสดงข้อความ error =====
+                     เดิม: หน้านี้ไม่แสดง error เลย ถ้าถูกจำกัดการส่งซ้ำหรือข้อมูลไม่ผ่าน ผู้ใช้จะไม่รู้ว่าคะแนนไม่ถูกบันทึก --}}
+                @if($errors->any())
+                    <div role="alert" style="background:#fff5f5; border:1px solid #feb2b2; color:#c53030; padding:12px 16px; border-radius:10px; margin-bottom:20px; font-size:14px; font-weight:600;">
+                        {{ $errors->first() }}
+                    </div>
+                @endif
+                {{-- ===== [จบ ข้อ 4] ===== --}}
+
+                {{-- ===== [เพิ่มใหม่ ระดับ 3 ข้อ 14] ข้อความเตือนเมื่อยังไม่เลือกคะแนน ===== --}}
+                <div id="rating-error" role="alert" style="display: none; background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; font-weight: 600;">
+                    กรุณาเลือกระดับความพึงพอใจก่อนส่งการประเมิน
+                </div>
+
+                {{-- [แก้ไข ระดับ 3 ข้อ 14] เพิ่ม novalidate + ตรวจด้วย JS
+                     เดิม: radio คะแนนเป็น required แต่ถูกซ่อนด้วย display:none เบราว์เซอร์จึงบล็อกการส่ง
+                           แต่แสดงข้อความเตือนไม่ได้ (ไม่มีช่องให้ชี้) ผู้ใช้กดส่งแล้วไม่มีอะไรเกิดขึ้น
+                     ใหม่: ปิดการตรวจของเบราว์เซอร์ แล้วตรวจเองพร้อมแสดงข้อความ (Controller ยังตรวจซ้ำอีกชั้น) --}}
+                <form action="{{ route('evaluation.store') }}" method="POST" id="evaluation-form" novalidate onsubmit="return validateEvaluationForm()">
                     @csrf 
 
                     <input type="hidden" name="checkin_id" value="{{ $checkin_id }}">
@@ -88,10 +106,15 @@
                                 (โปรดเขียนข้อเสนอแนะของคุณเพื่อให้เรานำไปปรับแก้ไขให้ดียิ่งขึ้น)
                             </span>
                         </label>
-                        <textarea id="feedback" name="comment"></textarea>
+                        {{-- [แก้ไข ระดับ 2 ข้อ 11] จำกัด 255 ตัวอักษรตามคอลัมน์ใน DB + แสดงตัวนับ
+                             และคืนข้อความเดิม (old) ถ้าส่งไม่ผ่าน ผู้ใช้จะได้ไม่ต้องพิมพ์ใหม่
+                             เดิม: <textarea id="feedback" name="comment"></textarea> --}}
+                        <textarea id="feedback" name="comment" maxlength="255" oninput="updateCommentCount(this)">{{ old('comment') }}</textarea>
+                        <div id="comment-count" style="text-align: right; font-size: 12px; color: #a0aec0; margin-top: 6px;">0/255</div>
                     </div>
 
-                    <button type="submit" class="submit-btn">ส่งการประเมิน</button>
+                    {{-- [แก้ไข ระดับ 3 ข้อ 14] เพิ่ม id เพื่อปิดปุ่มหลังกดส่ง กันกดซ้ำ --}}
+                    <button type="submit" class="submit-btn" id="evaluation-submit-btn">ส่งการประเมิน</button>
                 </form>
             </div>
         @endif
@@ -102,7 +125,43 @@
         document.addEventListener("DOMContentLoaded", function() {
             let hintText = document.getElementById('feedback-hint');
             if (hintText) hintText.style.display = 'none';
+
+            // [เพิ่มใหม่ ระดับ 2 ข้อ 11] นับตัวอักษรตั้งแต่เปิดหน้า (กรณีมีข้อความเดิมคืนมาจาก old)
+            let feedback = document.getElementById('feedback');
+            if (feedback) updateCommentCount(feedback);
         });
+
+        // ===== [เพิ่มใหม่ ระดับ 3 ข้อ 14] ตรวจฟอร์มก่อนส่ง =====
+        function validateEvaluationForm() {
+            let selected = document.querySelector('#evaluation-form input[name="rating"]:checked');
+            let ratingError = document.getElementById('rating-error');
+
+            if (!selected) {
+                if (ratingError) {
+                    ratingError.style.display = 'block';
+                    ratingError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return false;
+            }
+
+            // กันกดส่งซ้ำระหว่างรอเซิร์ฟเวอร์ตอบกลับ
+            let submitBtn = document.getElementById('evaluation-submit-btn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerText = 'กำลังส่ง...';
+            }
+            return true;
+        }
+        // ===== [จบ ข้อ 14] =====
+
+        // [เพิ่มใหม่ ระดับ 2 ข้อ 11] อัปเดตตัวนับตัวอักษร และเปลี่ยนเป็นสีส้มเมื่อใกล้ถึงขีดจำกัด
+        function updateCommentCount(textarea) {
+            let counter = document.getElementById('comment-count');
+            if (!counter) return;
+            let length = textarea.value.length;
+            counter.innerText = length + '/255';
+            counter.style.color = length >= 230 ? '#d97706' : '#a0aec0';
+        }
 
         function selectRating(selectedBox) {
             let allBoxes = document.querySelectorAll('.rating-item');
@@ -112,6 +171,10 @@
             });
             selectedBox.style.backgroundColor = '#fff9db';
             selectedBox.style.borderColor = '#ffcc00'; 
+
+            // [เพิ่มใหม่ ระดับ 3 ข้อ 14] เลือกคะแนนแล้ว ซ่อนข้อความเตือน
+            let ratingError = document.getElementById('rating-error');
+            if (ratingError) ratingError.style.display = 'none';
             
             let radioBtn = selectedBox.querySelector('input[type="radio"]');
             let ratingValue = parseInt(radioBtn.value); 

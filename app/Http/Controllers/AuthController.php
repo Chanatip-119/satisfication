@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter; // [แก้ไข ระดับ 1 ข้อ 4] ใช้จำกัดจำนวนครั้งที่กรอกผิด
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
@@ -58,10 +59,15 @@ class AuthController extends Controller
 
         $redirect = back()->with('status', 'ส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมลของคุณเรียบร้อยแล้ว กรุณาตรวจสอบกล่องข้อความ');
 
-        // หากเป็นโหมด Log Mailer ให้แนบ Direct URL เพื่อความสะดวกในการทดสอบโดยไม่ต้องเปิด log
-        if (config('mail.default') === 'log') {
+        // ===== [แก้ไข ระดับ 1 ข้อ 5] แสดงลิงก์ตรงบนหน้าจอเฉพาะเครื่องพัฒนาเท่านั้น =====
+        // เดิม: if (config('mail.default') === 'log') {
+        // ปัญหา: ถ้าเซิร์ฟเวอร์จริงยังใช้ MAIL_MAILER=log (ค่าเริ่มต้นของ Laravel)
+        //        ใครก็กรอกอีเมลของคนอื่นแล้วได้ลิงก์ตั้งรหัสผ่านใหม่ทันที
+        // หมายเหตุ: บนเซิร์ฟเวอร์จริงต้องตั้ง APP_ENV=production ใน .env
+        if (app()->environment('local') && config('mail.default') === 'log') {
             $redirect->with('direct_reset_url', $resetUrl);
         }
+        // ===== [จบ ข้อ 5] =====
 
         return $redirect;
     }
@@ -86,23 +92,38 @@ class AuthController extends Controller
             'password.min' => 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร',
         ]);
 
+        // ===== [แก้ไข ระดับ 1 ข้อ 4] จำกัดการเดา PIN: ต่ออีเมล 5 ครั้ง และต่อ IP 15 ครั้ง ภายใน 15 นาที =====
+        $emailKey = 'pin-reset:' . mb_strtolower(trim($request->email)) . '|' . $request->ip();
+        $ipKey = 'pin-reset-ip:' . $request->ip();
+
+        if (RateLimiter::tooManyAttempts($emailKey, 5) || RateLimiter::tooManyAttempts($ipKey, 15)) {
+            $minutes = ceil(max(RateLimiter::availableIn($emailKey), RateLimiter::availableIn($ipKey), 60) / 60);
+            return back()
+                ->withErrors(['pin_reset_error' => "ยืนยันตัวตนผิดหลายครั้งเกินไป กรุณารอประมาณ {$minutes} นาทีแล้วลองใหม่"])
+                ->withInput($request->only('email', 'staff_id'));
+        }
+
         $staff = Staff::where('staff_email', $request->email)->first();
-
-        if (!$staff) {
-            return back()->withErrors(['pin_reset_error' => 'ไม่พบบัญชีผู้ใช้งานที่ตรงกับอีเมลนี้'])->withInput();
-        }
-
-        // ตรวจสอบ staff_id
         $inputStaffIdNum = (int) preg_replace('/[^0-9]/', '', $request->staff_id);
-        if ($inputStaffIdNum <= 0 || (int)$staff->staff_id !== $inputStaffIdNum) {
-            return back()->withErrors(['pin_reset_error' => 'รหัสพนักงานไม่ตรงกับข้อมูลในระบบ'])->withInput();
+        $inputPin = preg_replace('/[^0-9]/', '', $request->pin);
+
+        // เดิม: ตรวจทีละขั้นและแจ้ง error แยกกัน (ไม่พบอีเมล / รหัสพนักงานไม่ตรง / PIN ไม่ถูกต้อง)
+        // ใหม่: ใช้ข้อความเดียวกันทุกกรณี เพื่อไม่ให้ผู้ไม่หวังดีรู้ว่าข้อมูลส่วนไหนถูกแล้ว
+        //       และไม่ส่งรหัสผ่านกับ PIN กลับไปใน old() (ใช้ withInput เฉพาะ email, staff_id)
+        if (!$staff
+            || $inputStaffIdNum <= 0
+            || (int) $staff->staff_id !== $inputStaffIdNum
+            || !$staff->verifyPinCode($inputPin)) {
+            RateLimiter::hit($emailKey, 900);
+            RateLimiter::hit($ipKey, 900);
+
+            return back()
+                ->withErrors(['pin_reset_error' => 'อีเมล รหัสพนักงาน หรือ PIN ไม่ถูกต้อง'])
+                ->withInput($request->only('email', 'staff_id'));
         }
 
-        // ตรวจสอบ PIN Code 4 หลัก
-        $inputPin = preg_replace('/[^0-9]/', '', $request->pin);
-        if (trim((string)$staff->staff_pincode) !== $inputPin) {
-            return back()->withErrors(['pin_reset_error' => 'รหัส PIN 4 หลักไม่ถูกต้อง'])->withInput();
-        }
+        RateLimiter::clear($emailKey);
+        // ===== [จบ ข้อ 4: resetPasswordWithPin] =====
 
         // อัปเดตรหัสผ่านใหม่
         $staff->password = Hash::make($request->password);
@@ -199,7 +220,9 @@ class AuthController extends Controller
         \App\Models\Staff::create([
             'staff_name' => $request->name,
             'staff_email' => $request->email,
-            'staff_pincode' => (string) rand(1000, 9999), // กำหนด Pincode เริ่มต้นแบบสุ่มไปก่อน (เพราะในฟอร์มไม่มีให้กรอก)
+            // [แก้ไข ระดับ 1 ข้อ 3] สุ่ม PIN ที่ไม่ซ้ำกับบุคลากรคนอื่น (ในฟอร์มไม่มีให้กรอก)
+            // เดิม: (string) rand(1000, 9999) — สุ่มโดยไม่ตรวจว่าซ้ำ ทำให้ Check-in ผิดคนได้
+            'staff_pincode' => Staff::generateUniquePin(),
             'password' => Hash::make($request->password),
             'role_id' => Staff::ROLE_EMPLOYEE,
         ]);
@@ -216,6 +239,21 @@ class AuthController extends Controller
         ]);
 
         $username = trim($request->username);
+
+        // ===== [แก้ไข ระดับ 1 ข้อ 4] จำกัดการเดารหัสผ่าน (นับเฉพาะครั้งที่ผิด) =====
+        // - ต่อบัญชี: ผิดได้ 5 ครั้ง/นาที
+        // - ต่อ IP: ผิดได้ 20 ครั้ง/5 นาที (กันการไล่ลองรหัส 123456 กับทุกบัญชี)
+        $userKey = 'login:' . mb_strtolower($username) . '|' . $request->ip();
+        $ipKey = 'login-ip:' . $request->ip();
+
+        if (RateLimiter::tooManyAttempts($userKey, 5) || RateLimiter::tooManyAttempts($ipKey, 20)) {
+            $seconds = max(RateLimiter::availableIn($userKey), RateLimiter::availableIn($ipKey), 60);
+            return back()->withErrors([
+                'username' => 'เข้าสู่ระบบผิดหลายครั้งเกินไป กรุณารอประมาณ ' . ceil($seconds / 60) . ' นาทีแล้วลองใหม่',
+            ])->onlyInput('username');
+        }
+        // ===== [จบ ข้อ 4: ตรวจก่อนล็อกอิน] =====
+
         $fieldType = 'staff_name';
         $loginValue = $username;
 
@@ -231,9 +269,14 @@ class AuthController extends Controller
         }
 
         if (\Illuminate\Support\Facades\Auth::attempt([$fieldType => $loginValue, 'password' => $request->password])) {
+            RateLimiter::clear($userKey); // [แก้ไข ระดับ 1 ข้อ 4] ล็อกอินสำเร็จ ล้างตัวนับของบัญชีนี้
             $request->session()->regenerate();
             return redirect()->intended('dashboard');
         }
+
+        // [แก้ไข ระดับ 1 ข้อ 4] ล็อกอินไม่สำเร็จ นับครั้งที่ผิด (บัญชี 60 วินาที, IP 5 นาที)
+        RateLimiter::hit($userKey, 60);
+        RateLimiter::hit($ipKey, 300);
 
         return back()->withErrors([
             'username' => 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง',

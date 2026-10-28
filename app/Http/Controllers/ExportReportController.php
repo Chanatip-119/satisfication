@@ -21,7 +21,9 @@ class ExportReportController extends Controller
     {
         $request->validate([
             'export_type' => 'required|in:pdf,excel',
-            'time_range' => 'required',
+            // [แก้ไข ระดับ 3 ข้อ 15] รับเฉพาะช่วงเวลาที่มีในหน้าเว็บ
+            // เดิม: 'required' — ส่งค่าอื่นมาจะไม่เข้า case ใดเลย แล้วระบบส่งออกข้อมูล "ทั้งหมด" โดยไม่ตั้งใจ
+            'time_range' => 'required|in:today,week,month,custom',
         ]);
 
         return DB::transaction(function () use ($request) {
@@ -56,7 +58,9 @@ class ExportReportController extends Controller
                 $selectedCounters = $request->counters;
             }
 
-            $query = Evaluation::with(['checkin.staff', 'checkin.schedule.counterSub']);
+            // [แก้ไข ระดับ 3 ข้อ 15] โหลด counter มาด้วย เพื่อแสดงชื่อเคาน์เตอร์ที่อ่านเข้าใจได้
+            // เดิม: Evaluation::with(['checkin.staff', 'checkin.schedule.counterSub']);
+            $query = Evaluation::with(['checkin.staff', 'checkin.schedule.counterSub.counter']);
 
             if ($startDate && $endDate) {
                 $query->whereBetween('evaluation_at', [$startDate, $endDate]);
@@ -70,25 +74,45 @@ class ExportReportController extends Controller
 
             $evaluations = $query->orderBy('evaluation_at', 'desc')->get();
 
+            // ===== [แก้ไข ระดับ 3 ข้อ 15] เตรียมข้อมูลแต่ละแถวไว้ที่เดียว ใช้ร่วมกันทั้ง PDF และ CSV =====
+            // เดิม: PDF แสดงคอลัมน์เคาน์เตอร์เป็นแค่เลข counter_sub_id (เช่น "7") และ CSV เป็น "เคาน์เตอร์ 7"
+            //       ซึ่งไม่ตรงกับชื่อที่ใช้ในหน้าอื่น คนอ่านรายงานจะไม่รู้ว่าคือจุดไหน
+            $rows = $evaluations->map(function ($eval) {
+                $evaluatedAt = Carbon::parse($eval->evaluation_at);
+                return [
+                    'date'    => $evaluatedAt->format('d/m/Y'),
+                    'time'    => $evaluatedAt->format('H:i'),
+                    'counter' => $this->counterLabel($eval),
+                    'staff'   => $eval->checkin && $eval->checkin->staff ? $eval->checkin->staff->staff_name : 'ไม่ระบุ',
+                    'rating'  => (int) $eval->rating,
+                    'comment' => (string) ($eval->comment ?? ''),
+                ];
+            });
+            // ===== [จบ ข้อ 15: เตรียมข้อมูล] =====
+
             if ($request->export_type === 'pdf') {
-                return $this->exportPDF($evaluations, $startDate, $endDate);
+                return $this->exportPDF($rows, $startDate, $endDate);
             } else {
-                return $this->exportExcel($evaluations);
+                return $this->exportExcel($rows);
             }
         });
     }
 
-    private function exportPDF($evaluations, $startDate, $endDate)
+    // [แก้ไข ระดับ 3 ข้อ 15] รับ $rows ที่เตรียมไว้แล้ว แทน $evaluations
+    private function exportPDF($rows, $startDate, $endDate)
     {
         $dateLabel = ($startDate && $endDate) 
             ? $startDate->format('d/m/Y') . ' - ' . $endDate->format('d/m/Y') 
             : 'ทั้งหมด';
 
-        $pdf = Pdf::loadView('report.export_pdf_template', compact('evaluations', 'dateLabel'));
+        // [แก้ไข ระดับ 3 ข้อ 15] กำหนดขนาดกระดาษ A4 ชัดเจน (ฟอนต์ไทยตั้งค่าไว้ใน export_pdf_template)
+        $pdf = Pdf::loadView('report.export_pdf_template', compact('rows', 'dateLabel'))
+            ->setPaper('a4', 'portrait');
         return $pdf->download('report_' . date('Ymd_His') . '.pdf');
     }
 
-    private function exportExcel($evaluations)
+    // [แก้ไข ระดับ 3 ข้อ 15] รับ $rows ที่เตรียมไว้แล้ว แทน $evaluations
+    private function exportExcel($rows)
     {
         $fileName = 'report_' . date('Ymd_His') . '.csv';
         $headers = [
@@ -99,25 +123,21 @@ class ExportReportController extends Controller
             "Expires"             => "0"
         ];
 
-        $callback = function () use ($evaluations) {
+        $callback = function () use ($rows) {
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
             
             fputcsv($file, ['วันที่', 'เวลา', 'เคาน์เตอร์', 'รายชื่อ', 'คะแนน', 'ความคิดเห็น']);
 
-            foreach ($evaluations as $eval) {
-                $counterId = $eval->checkin && $eval->checkin->schedule ? 'เคาน์เตอร์ ' . $eval->checkin->schedule->counter_sub_id : 'ไม่ระบุ';
-                $staffName = $eval->checkin && $eval->checkin->staff ? $eval->checkin->staff->staff_name : 'ไม่ระบุ';
-                $date = Carbon::parse($eval->evaluation_at)->format('d/m/Y');
-                $time = Carbon::parse($eval->evaluation_at)->format('H:i');
-
+            foreach ($rows as $row) {
+                // [เพิ่มเติม ระดับ 3] กัน CSV Injection ทุกช่องที่เป็นข้อความ
                 fputcsv($file, [
-                    $date,
-                    $time,
-                    $counterId,
-                    $staffName,
-                    $eval->rating,
-                    $eval->comment
+                    $row['date'],
+                    $row['time'],
+                    $this->csvSafe($row['counter']),
+                    $this->csvSafe($row['staff']),
+                    $row['rating'],
+                    $this->csvSafe($row['comment']),
                 ]);
             }
             fclose($file);
@@ -125,4 +145,32 @@ class ExportReportController extends Controller
 
         return response()->stream($callback, 200, $headers);
     }
+
+    // ===== [เพิ่มใหม่ ระดับ 3 ข้อ 15] ชื่อเคาน์เตอร์ที่อ่านเข้าใจได้ =====
+    // ผลลัพธ์ เช่น "เคาน์เตอร์ 8 — บริการเคาน์เตอร์ชั้น 6"
+    private function counterLabel($eval): string
+    {
+        $schedule = $eval->checkin?->schedule;
+        if (!$schedule) {
+            return 'ไม่ระบุ';
+        }
+
+        $counter = $schedule->counterSub?->counter;
+        if (!$counter) {
+            return 'จุดบริการ ID ' . $schedule->counter_sub_id;
+        }
+
+        return 'เคาน์เตอร์ ' . $counter->counter_id . ' — ' . $counter->counter_location;
+    }
+    // ===== [จบ ข้อ 15: counterLabel] =====
+
+    // ===== [เพิ่มใหม่ ระดับ 3 — แก้เพิ่มจากที่หลุดในระดับ 1] กัน CSV Injection =====
+    // ความคิดเห็นมาจากผู้รับบริการที่ไม่ต้องล็อกอิน ถ้าขึ้นต้นด้วย = + - @ เมื่อเปิดใน Excel จะถูกตีความเป็นสูตรและทำงานทันที
+    // เติม ' นำหน้า เพื่อให้ Excel แสดงเป็นข้อความธรรมดา
+    private function csvSafe($value): string
+    {
+        $value = (string) ($value ?? '');
+        return preg_match('/^[=+\-@\t\r]/u', $value) ? "'" . $value : $value;
+    }
+    // ===== [จบ CSV Injection] =====
 }

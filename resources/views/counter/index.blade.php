@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="{{ asset('css/counter.css') }}?v={{ filemtime(public_path('css/counter.css')) }}">
 </head>
 <body>
+@php
+    $isEmployee = auth()->check() && auth()->user()->isEmployee();
+@endphp
 
     <aside class="sidebar">
     <div class="sidebar-logo">
@@ -23,10 +26,10 @@
     <a href="{{ route('counter.index') }}" class="menu-item {{ Route::is('counter.*') ? 'active' : '' }}">เคาน์เตอร์</a>
     <a href="{{ route('staff.index') }}" class="menu-item {{ Route::is('staff.*') ? 'active' : '' }}">บุคลากร</a>
     <a href="{{ url('/qrcode') }}" class="menu-item">QR Code</a>
-
+    @unless($isEmployee)
     <div class="menu-category">ระบบ</div>
     <a href="{{ route('report.export.index') }}" class="menu-item {{ Route::is('report.export.index') ? 'active' : '' }}">ส่งออกรายงาน</a>
-
+    @endunless
         <div class="user-profile-container">
             <!-- เมนู Dropdown (ซ่อนไว้เริ่มต้น) -->
             <div class="profile-dropdown-menu" id="profileDropdown">
@@ -234,6 +237,16 @@
     <script>
         let currentMaxSubId = 0;
 
+        // [เพิ่มใหม่ ระดับ 2 ข้อ 8] ตั้งค่า radio สถานะเคาน์เตอร์โดยไม่เขียนทับสถานะของจุดย่อย
+        // เดิม: ใช้ .click() ซึ่งไปเรียก updateRadioUI() แล้วเปลี่ยน is_active ของจุดย่อยทุกจุดให้เท่ากับเคาน์เตอร์หลัก
+        //       แค่เปิด Modal แล้วกดบันทึก สถานะที่ตั้งแยกไว้ของแต่ละจุดย่อยจะหายหมด
+        function setCounterStatusRadio(value) {
+            const radio = document.querySelector('input[name="is_active"][value="' + value + '"]');
+            if (!radio) return;
+            radio.checked = true;
+            updateRadioUI(radio, false);
+        }
+
         function openModal(modalId, mode, data = null) {
             const modal = document.getElementById(modalId);
             modal.style.display = 'flex';
@@ -247,11 +260,8 @@
                 document.getElementById('inp_counter_id').readOnly = true;
                 document.getElementById('inp_counter_location').value = data.counter_location;
                 
-                if(data.is_active) {
-                    document.querySelector('input[name="is_active"][value="1"]').click();
-                } else {
-                    document.querySelector('input[name="is_active"][value="0"]').click();
-                }
+                // [แก้ไข ระดับ 2 ข้อ 8] เดิม: document.querySelector(...).click();
+                setCounterStatusRadio(data.is_active ? '1' : '0');
                 
                 document.getElementById('form-unified').action = `/counter/${data.counter_id}`;
                 document.getElementById('form-method').value = 'PUT';
@@ -274,16 +284,14 @@
                         const dotColor = isActive ? '#38a169' : '#e53e3e';
                         const pillText = isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน';
 
-                        let startTime = '08:00';
-                        let endTime = '16:00';
-                        if (sub.schedules && sub.schedules.length > 0) {
-                            startTime = sub.schedules[0].start_time.substring(0, 5); 
-                            endTime = sub.schedules[0].end_time.substring(0, 5);
-                        }
+                        // [แก้ไข ระดับ 2 ข้อ 8] ลบการอ่านเวลาจาก sub.schedules[0] ออก
+                        // เดิม: let startTime = sub.schedules[0].start_time ... (ได้กะของบุคลากรในวันที่ไกลที่สุด ไม่ใช่เวลาเคาน์เตอร์)
 
                         // ดึงชื่อเคาน์เตอร์หลักมาแสดง
                         const mainCounterName = data.counter_location || 'ไม่ระบุชื่อเคาน์เตอร์';
 
+                        // [แก้ไข ระดับ 2 ข้อ 8] ลบ <div class="time-inputs"> ที่ซ่อนช่องเวลาไว้ออก
+                        // เดิม: มี existing_start_time[] / existing_end_time[] ซ่อนอยู่ และถูกส่งไปเขียนทับเวลากะทุกครั้งที่กดบันทึก
                         container.innerHTML += `
                             <div class="sub-counter-item" style="display: flex; align-items: center; gap: 15px; padding: 10px 0; border-bottom: 1px dashed #e2e8f0;">
                                 <div class="sub-id" style="font-size:16px; font-weight:700; color:#FFCC00; width:40px; text-align:center;">
@@ -295,11 +303,7 @@
                                     ${mainCounterName}
                                 </div>
 
-                                <div class="time-inputs" style="display:none;">
-                                    <input type="hidden" name="existing_sub_id[]" value="${sub.counter_sub_id}">
-                                    <input type="time" name="existing_start_time[]" value="${startTime}">
-                                    <input type="time" name="existing_end_time[]" value="${endTime}">
-                                </div>
+                                <input type="hidden" name="existing_sub_id[]" value="${sub.counter_sub_id}">
                                 <input type="hidden" name="existing_is_active[]" class="sub-is-active-input" value="${sub.is_active ? 1 : 0}">
                                 <div class="sub-pill ${pillClass}" style="white-space:nowrap; ${pillBg}">
                                     <span style="color:${dotColor}">●</span> ${pillText}
@@ -324,11 +328,12 @@
                 document.getElementById('form-unified').action = `{{ route('counter.store') }}`;
                 document.getElementById('form-method').value = 'POST';
 
-                document.querySelector('input[name="is_active"][value="1"]').click();
+                document.getElementById('sub-counter-list-container').innerHTML = ''; 
+                // [แก้ไข ระดับ 2 ข้อ 8] เดิม: document.querySelector('input[name="is_active"][value="1"]').click();
+                setCounterStatusRadio('1');
                 document.getElementById('delete-section').style.display = 'none';
                 
                 document.getElementById('tab-subcounter-nav').style.display = 'block';
-                document.getElementById('sub-counter-list-container').innerHTML = ''; 
                 
                 document.getElementById('tab-btn-general').click();
             }
@@ -354,7 +359,10 @@
             }
         }
 
-        function updateRadioUI(radio) {
+        // [แก้ไข ระดับ 2 ข้อ 8] เพิ่มพารามิเตอร์ syncSubs
+        // - ผู้ใช้กดเปลี่ยนสถานะเอง (onclick) → syncSubs = true ให้จุดย่อยทั้งหมดเปลี่ยนตาม (พฤติกรรมเดิม)
+        // - ระบบตั้งค่าตอนเปิด Modal → syncSubs = false ไม่แตะสถานะของจุดย่อย
+        function updateRadioUI(radio, syncSubs = true) {
             const lblActive = document.getElementById('lbl_status_active');
             const lblClose = document.getElementById('lbl_status_close');
             
@@ -375,6 +383,9 @@
                 lblClose.querySelector('span').innerText = '●';
                 lblClose.querySelector('span').style.color = '#e53e3e';
             }
+
+            // [แก้ไข ระดับ 2 ข้อ 8] ถ้าไม่ได้สั่งให้ sync ให้หยุดตรงนี้ ไม่เปลี่ยนสถานะจุดย่อย
+            if (!syncSubs) return;
 
             const subPills = document.querySelectorAll('.sub-pill');
             subPills.forEach(pill => {
@@ -416,6 +427,8 @@
             const dotColor = isActive ? '#38a169' : '#e53e3e';
             const pillText = isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน';
 
+        // [แก้ไข ระดับ 2 ข้อ 8] ลบช่องเวลาที่ซ่อนไว้ (new_start_time[] / new_end_time[]) ออก
+        // Controller ใช้ new_is_active[] เป็นตัวนับจำนวนจุดย่อยที่จะสร้างแทน
         container.insertAdjacentHTML('beforeend', `
             <div class="sub-counter-item" style="display: flex; align-items: center; gap: 15px; padding: 10px 0; border-bottom: 1px dashed #e2e8f0;">
             <div class="sub-id" style="font-size:16px; font-weight:700; color:#FFCC00; width:40px; text-align:center;">
@@ -425,12 +438,6 @@
             <!-- แสดงชื่อเคาน์เตอร์หลัก (เช่น บริการชั้น 5) -->
             <div class="counter-name-display" style="flex:1; font-size: 14px; color: #4a5568;">
                 ${mainCounterName}
-            </div>
-            
-            <!-- ซ่อนกล่องเวลาไว้ (ยังส่งค่ากลับไปบันทึกได้ปกติ) -->
-            <div class="time-inputs" style="display:none;">
-                <input type="time" name="new_start_time[]" value="08:00" required>
-                <input type="time" name="new_end_time[]" value="16:00" required>
             </div>
             
             <div style="display:flex; justify-content: flex-end; align-items: center; gap: 10px;">
