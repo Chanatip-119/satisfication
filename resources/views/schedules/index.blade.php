@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ตารางปฏิบัติงาน</title>
-    <link rel="stylesheet" href="{{ asset('css/schedule.css') }}?v={{ time() }}">
+    {{-- [แก้ไข ระดับ 4] โหลด layout.css (โครงหน้าที่ใช้ร่วมกันทุกหน้า) ก่อน CSS ของหน้านี้ --}}
+    <link rel="stylesheet" href="{{ asset('css/layout.css') }}?v={{ filemtime(public_path('css/layout.css')) }}">
+    {{-- [แก้ไข ระดับ 4] เปลี่ยน ?v={{ time() }} เป็นวันที่แก้ไฟล์ — เดิมเบราว์เซอร์ต้องโหลด CSS ใหม่ทุกครั้งที่เปิดหน้า --}}
+    <link rel="stylesheet" href="{{ asset('css/schedule.css') }}?v={{ filemtime(public_path('css/schedule.css')) }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>

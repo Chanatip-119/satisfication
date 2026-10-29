@@ -120,20 +120,11 @@ class StaffController extends Controller
 
         $staff = Staff::with('role')->findOrFail($id);
 
-        // ===== [แก้ไข ระดับ 3 ข้อ 16] ชื่อเคาน์เตอร์รูปแบบเดียวกับหน้าจัดการเคาน์เตอร์ (เช่น "เคาน์เตอร์ 8.1") =====
-        // เดิม: 'เคาน์เตอร์ 1.' . counter_sub_id — ทุกเคาน์เตอร์ขึ้นเป็น "1.x" และเลขหลังจุดเป็น ID ของทั้งระบบ
-        $subCodeMap = [];
-        foreach (CounterSub::orderBy('counter_sub_id')->get(['counter_sub_id', 'counter_id'])->groupBy('counter_id') as $counterId => $subs) {
-            foreach ($subs->values() as $i => $sub) {
-                $subCodeMap[$sub->counter_sub_id] = $counterId . '.' . ($i + 1);
-            }
-        }
-        $counterLabel = function ($schedule) use ($subCodeMap) {
-            return ($schedule && isset($subCodeMap[$schedule->counter_sub_id]))
-                ? 'เคาน์เตอร์ ' . $subCodeMap[$schedule->counter_sub_id]
-                : 'ไม่ระบุ';
+        // [แก้ไข ระดับ 4] ใช้ตัวช่วยกลาง CounterSub::labelFor() แทนการสร้างตารางเลขเองในเมธอดนี้
+        // (เดิม [ระดับ 3 ข้อ 16] สร้าง $subCodeMap เองที่นี่ — ผลลัพธ์เหมือนกัน แต่ตอนนี้ทุกหน้าใช้โค้ดชุดเดียว)
+        $counterLabel = function ($schedule) {
+            return $schedule ? CounterSub::labelFor($schedule->counter_sub_id) : 'ไม่ระบุ';
         };
-        // ===== [จบ ข้อ 16: counterLabel] =====
         
         $checkins = Checkin::with(['schedule'])->where('staff_id', $id)->orderBy('checkin_at', 'desc')->get();
         $checkinIds = $checkins->pluck('checkin_id');

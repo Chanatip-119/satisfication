@@ -38,12 +38,12 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
+        public function down(): void
     {
-        Schema::table('checkin', function (Blueprint $table) {
-            $table->dropForeign(['staff_id']);
-            $table->dropColumn('staff_id');
-        });
+        // [แก้ไข ระดับ 4] ลบส่วนที่ dropColumn('staff_id') ของตาราง checkin ออก
+        // เดิม: Schema::table('checkin', ...) { dropForeign(['staff_id']); dropColumn('staff_id'); }
+        // ปัญหา: คอลัมน์ checkin.staff_id ถูกสร้างโดย migration ของตาราง checkin ตั้งแต่แรก ไม่ใช่ไฟล์นี้
+        //        ถ้า rollback ไฟล์นี้ ข้อมูลว่า "ใคร Check-in" จะหายทั้งตาราง
 
         Schema::table('schedule', function (Blueprint $table) {
             $table->dropForeign(['counter_sub_id']);

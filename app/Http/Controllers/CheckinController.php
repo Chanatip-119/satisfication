@@ -30,7 +30,9 @@ class CheckinController extends Controller
                 ->first();
 
         $counterSub = CounterSub::with('counter')->where('counter_sub_id', $counterId)->first();
-        $counterName = $counterSub ? 'เคาน์เตอร์ ' . $counterSub->counter_id . '.' . $counterSub->counter_sub_id : 'เคาน์เตอร์ ' . $counterId;
+        // [แก้ไข ระดับ 4] ชื่อเคาน์เตอร์รูปแบบเดียวกันทั้งระบบ (เช่น "เคาน์เตอร์ 8.1")
+        // เดิม: 'เคาน์เตอร์ ' . counter_id . '.' . counter_sub_id (เช่น "1.7" ซึ่งเลขหลังจุดเป็น ID ของทั้งระบบ)
+        $counterName = CounterSub::labelFor($counterId);
         $locationName = ($counterSub && $counterSub->counter) ? $counterSub->counter->counter_location : 'ไม่ระบุตำแหน่ง';
 
         $counterObj = (object)[
@@ -234,7 +236,8 @@ class CheckinController extends Controller
 
                 $countersList->push((object)[
                     'id'           => $sub->counter_sub_id,
-                    'name'         => 'เคาน์เตอร์ ' . $counter->counter_id . '.' . $sub->counter_sub_id,
+                    // [แก้ไข ระดับ 4] เดิม: 'เคาน์เตอร์ ' . $counter->counter_id . '.' . $sub->counter_sub_id
+                    'name'         => CounterSub::labelFor($sub->counter_sub_id),
                     'time_start'   => $displaySchedule ? substr($displaySchedule->start_time, 0, 5) : '-',
                     'time_end'     => $displaySchedule ? substr($displaySchedule->end_time, 0, 5) : '-',
                     'is_available' => !$hasActiveCheckin,
@@ -327,7 +330,8 @@ class CheckinController extends Controller
             $currentStaffName = $activeCheckin->staff?->staff_name ?? 'บุคลากรท่านอื่น';
         }
 
-        $counterName = $counterSub ? 'เคาน์เตอร์ ' . $counterSub->counter_id . '.' . $counterSub->counter_sub_id : 'เคาน์เตอร์ ' . $request->counter_id;
+        // [แก้ไข ระดับ 4] เดิม: 'เคาน์เตอร์ ' . counter_id . '.' . counter_sub_id
+        $counterName = CounterSub::labelFor($counterSub->counter_sub_id);
 
         // ผูกขั้นยืนยันกับ PIN และเคาน์เตอร์ที่เลือก ป้องกันการแก้ staff_id ในฟอร์มขั้นถัดไป
         $request->session()->put('checkin_confirmation', [

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>จัดการบุคลากร</title>
+    {{-- [แก้ไข ระดับ 4] โหลด layout.css (โครงหน้าที่ใช้ร่วมกันทุกหน้า) ก่อน CSS ของหน้านี้ --}}
+    <link rel="stylesheet" href="{{ asset('css/layout.css') }}?v={{ filemtime(public_path('css/layout.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/staff.css') }}?v={{ filemtime(public_path('css/staff.css')) }}">
 </head>
 <body>

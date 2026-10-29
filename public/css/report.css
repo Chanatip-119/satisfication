@@ -1,5 +1,14 @@
-.page-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-.dropdown-filter { padding: 8px 15px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; font-family: 'Sarabun', sans-serif; color: #4a5568; outline: none; }
+/* =========================================================================
+   report.css — สไตล์เฉพาะหน้ารายงานเคาน์เตอร์และรายงาน Staff (โหลดต่อจาก layout.css และ staff.css)
+   [แก้ไข ระดับ 4]
+   - ย้ายส่วนที่ใช้ร่วมกันไปไว้ที่ layout.css แล้ว:
+     "บังคับให้ Sidebar ยาวเต็มจอ", "ดันเนื้อหาหลัก", "ปุ่ม Logout", "User Profile Sidebar Section"
+   - รวมกฎที่เดิมประกาศซ้ำ 2 รอบในไฟล์เดียวกัน (.page-header-flex, .table-card, table, th, td)
+     ให้เหลือรอบเดียว โดยใช้ค่าของรอบหลังซึ่งเป็นค่าที่แสดงผลจริง
+   - ลบคลาสที่ไม่มีหน้าไหนใช้: .dropdown-filter, .status-badge.check-in, .status-badge.check-out
+   ========================================================================= */
+
+.page-header-flex { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 25px; }
 
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
 .stat-card { background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
@@ -9,13 +18,15 @@
 .table-card { background-color: #ffffff; border-radius: 15px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
 .table-title { font-size: 16px; font-weight: 600; color: #1a202c; margin-bottom: 20px; }
 
-table { width: 100%; border-collapse: collapse; }
-th { text-align: left; padding: 12px 10px; color: #4a5568; font-size: 13px; font-weight: 600; border-bottom: 1px solid #edf2f7; }
+table { width: 100%; border-collapse: collapse; text-align: center; }
+th { text-align: center; padding: 12px 10px; color: #4a5568; font-size: 13px; font-weight: 600; border-bottom: 1px solid #edf2f7; }
+th:first-child, td:first-child { text-align: left; }
 td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middle; font-size: 14px; color: #2d3748; }
 
 .rating-badge { padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; display: inline-block; }
 .rating-good { background-color: #d1fae5; color: #065f46; } 
 .rating-bad { background-color: #fef3c7; color: #92400e; } 
+.rating-none { color: #a0aec0; }
 
 .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
 .status-badge.active { background-color: #e6ffed; color: #008000; }
@@ -23,164 +34,9 @@ td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middl
 .status-badge.close { background-color: #f0f0f0; color: #718096; }
 .status-badge.close .dot { width: 6px; height: 6px; background-color: #718096; border-radius: 50%; }
 
-.page-header-flex { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 25px; }
-        .table-card { background-color: #ffffff; border-radius: 15px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
-        
-        table { width: 100%; border-collapse: collapse; text-align: center; }
-        th { text-align: center; padding: 12px 10px; color: #4a5568; font-size: 13px; font-weight: 600; border-bottom: 1px solid #edf2f7; }
-        th:first-child, td:first-child { text-align: left; }
-        td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middle; font-size: 14px; color: #2d3748; }
-        
-        .rating-none { color: #a0aec0; }
-        .status-badge.check-in { background-color: #e6ffed; color: #008000; }
-        .status-badge.check-in .dot { width: 6px; height: 6px; background-color: #008000; border-radius: 50%; }
-        .status-badge.check-out { background-color: #f0f0f0; color: #718096; }
-        .status-badge.check-out .dot { width: 6px; height: 6px; background-color: #718096; border-radius: 50%; }
+.btn-outline { padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-weight: 600; color: #4a5568; background: white; cursor: pointer; transition: 0.2s; }
+.btn-outline:hover { border-color: #cbd5e0; background: #f7fafc; }
 
-        .btn-outline { padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-weight: 600; color: #4a5568; background: white; cursor: pointer; transition: 0.2s; }
-        .btn-outline:hover { border-color: #cbd5e0; background: #f7fafc; }
-
-/* บังคับให้ Sidebar ยาวเต็มจอเสมอแม้เลื่อนหน้าจอลงมาด้านล่าง */
-.sidebar {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    bottom: 0 !important;
-    height: 100vh !important;
-    min-height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    z-index: 100 !important;
-}
-
-/* ดันเนื้อหาหลักไม่ให้ทับกับ Sidebar ที่ถูกตรึงไว้ */
-.content {
-    margin-left: 240px !important; /* ถ้าความกว้าง sidebar ของคุณคือ 240px หรือ 250px ให้ปรับตัวเลขนี้ให้ตรงกันครับ */
-    min-height: 100vh !important;
-}
-
-/* ปุ่ม Logout เกาะติดขอบล่างสุดเสมอ */
-.logout-btn {
-    margin-top: auto !important;
-    color: #fff !important;
-    text-decoration: none !important;
-    padding: 14px 16px 6px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
-}
-.logout-btn:hover {
-    opacity: 0.85;
-}
-
-/* =========================================
-   User Profile Sidebar Section
-========================================= */
-.sidebar {
-    position: relative; /* สำคัญ: เพื่อให้กล่องโปรไฟล์เกาะอยู่ด้านล่างสุดของ Sidebar ได้ */
-    padding-bottom: 80px; /* เว้นที่ว่างด้านล่างไม่ให้เมนูอื่นๆ โดนโปรไฟล์บัง */
-}
-
-.user-profile-container {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.user-profile-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 15px 20px;
-    color: #333;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.user-profile-toggle:hover {
-    background-color: rgba(0, 0, 0, 0.08);
-}
-
-.avatar {
-    width: 38px;
-    height: 38px;
-    background-color: #fff;
-    color: #e5a900;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 16px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    flex-shrink: 0;
-}
-
-.user-info {
-    flex: 1;
-    overflow: hidden;
-}
-
-.user-name {
-    font-size: 14px;
-    font-weight: 700;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-}
-
-.user-role {
-    font-size: 12px;
-    color: #555;
-}
-
-.profile-dropdown-menu {
-    display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    width: 100%;
-    background-color: #fff;
-    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
-    z-index: 100;
-}
-
-.profile-dropdown-menu.show {
-    display: block;
-}
-
-.dropdown-item {
-    display: flex;
-    align-items: center;
-    padding: 15px 20px;
-    color: #333;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 600;
-    transition: background 0.2s;
-}
-
-.dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
-.dropdown-item.text-danger {
-    color: #e53e3e;
-}
-
-.chevron-icon {
-    transition: transform 0.3s;
-}
-
-.user-profile-container.open .chevron-icon {
-    transform: rotate(180deg);
-}
 .counter-report-table { table-layout: fixed; }
 .counter-report-table th { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 .counter-report-table th:nth-child(1), .counter-report-table td:nth-child(1) { width: 20%; text-align: left; }

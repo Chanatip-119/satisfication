@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR Code เคาน์เตอร์</title>
-    <!-- โหลด CSS พร้อมกัน Cache -->
-    <link rel="stylesheet" href="{{ asset('css/schedule.css') }}?v={{ time() }}">
+    {{-- [แก้ไข ระดับ 4] ใช้ layout.css แทน schedule.css
+         เดิม: <link ... css/schedule.css?v={{ time() }}> — โหลดไฟล์ของหน้าตารางทั้งไฟล์เพื่อเอาแค่ layout --}}
+    <link rel="stylesheet" href="{{ asset('css/layout.css') }}?v={{ filemtime(public_path('css/layout.css')) }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- ลิงก์ไปยังไฟล์ CSS ที่แยกออกมา -->
-    <link rel="stylesheet" href="{{ asset('css/qrcode.css') }}?v={{ time() }}">
+    <link rel="stylesheet" href="{{ asset('css/qrcode.css') }}?v={{ filemtime(public_path('css/qrcode.css')) }}">
 </head>
 <body>
 @php
@@ -29,8 +29,6 @@
         <a href="{{ url('/qrcode') }}" class="menu-item active">QR Code</a>
         @unless($isEmployee)
         <div class="menu-category">ระบบ</div>
-        @endunless
-        @unless($isEmployee)
         <a href="{{ route('report.export.index') }}" class="menu-item">ส่งออกรายงาน</a>
         @endunless
         <!-- ส่วนโปรไฟล์ผู้ใช้งาน -->
@@ -73,36 +71,45 @@
     <div class="content">
         <div class="qr-header">
             <h1>QR Code เคาน์เตอร์</h1>
-            <p>สร้างและดาวน์โหลด QR Code สำหรับแต่ละเคาน์เตอร์ พร้อมลิงก์ URL สำหรับประเมิน</p>
+            <p>สร้างและดาวน์โหลด QR Code สำหรับแต่ละเคาน์เตอร์ พร้อมลิงก์ URL สำหรับประเมิน — กด Ctrl+P เพื่อพิมพ์ QR ทุกจุดในครั้งเดียว</p>
         </div>
 
         <div class="qr-grid">
             @foreach($counterSubs as $sub)
                 @php
-                    $isActive = $sub->is_active;
+                    // [แก้ไข ระดับ 4] เปิดใช้งานเมื่อทั้งจุดย่อยและเคาน์เตอร์หลักเปิดอยู่
+                    // เดิม: $isActive = $sub->is_active; (ไม่สนสถานะเคาน์เตอร์หลัก)
+                    $isActive = $sub->is_active && $sub->counter && $sub->counter->is_active;
                     $locationText = $sub->counter ? $sub->counter->counter_location : '';
                     $displaySubtitle = $locationText;
+
+                    // [แก้ไข ระดับ 4] ชื่อเคาน์เตอร์รูปแบบเดียวกันทั้งระบบ (เช่น "เคาน์เตอร์ 8.1")
+                    // เดิม: "เคาน์เตอร์ {{ $sub->counter_sub_id }}" เช่น "เคาน์เตอร์ 7" ซึ่งไม่ตรงกับชื่อในหน้าจัดการเคาน์เตอร์
+                    //       ตอนพิมพ์ไปติดจึงสับสนได้ง่ายว่าเป็นจุดไหน
+                    $counterLabel = \App\Models\CounterSub::labelFor($sub->counter_sub_id);
+                    $fileSafeLabel = str_replace([' ', '.'], '_', $counterLabel);
                     
                     $evaluationUrl = route('evaluation.create', ['counter_sub_id' => $sub->counter_sub_id]);
                     $qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($evaluationUrl) . "&margin=15";
-                    $inputId = 'url-input-' . str_replace('.', '_', $sub->counter_sub_id);
+                    $inputId = 'url-input-' . $sub->counter_sub_id;
                 @endphp
 
                 @if($isActive)
                     <div class="qr-card">
                         <div class="qr-image-container" id="qr-container-{{ $sub->counter_sub_id }}">
-                            <img src="{{ $qrImageUrl }}" alt="QR Code {{ $sub->counter_sub_id }}" crossorigin="anonymous" id="qr-img-{{ str_replace('.', '_', $sub->counter_sub_id) }}">
+                            <img src="{{ $qrImageUrl }}" alt="QR Code {{ $counterLabel }}" crossorigin="anonymous" id="qr-img-{{ $sub->counter_sub_id }}">
                         </div>
-                        <div class="qr-title">เคาน์เตอร์ {{ $sub->counter_sub_id }}</div>
+                        <div class="qr-title">{{ $counterLabel }}</div>
                         <div class="qr-subtitle">{{ $displaySubtitle }}</div>
                         
                         <!-- ปุ่มดาวน์โหลด PNG -->
-                        <button onclick="downloadQR('qr-img-{{ str_replace('.', '_', $sub->counter_sub_id) }}', 'เคาน์เตอร์_{{ $sub->counter_sub_id }}')" class="btn-download">
+                        <button onclick="downloadQR('qr-img-{{ $sub->counter_sub_id }}', '{{ $fileSafeLabel }}')" class="btn-download">
                             <i class="fas fa-download"></i> ดาวน์โหลด PNG
                         </button>
 
                         <!-- ส่วน URL และปุ่มคัดลอก URL -->
-                        <div style="margin-top: 12px; width: 100%; text-align: left;">
+                        {{-- [แก้ไข ระดับ 4] เพิ่ม class qr-url-group เพื่อซ่อนตอนพิมพ์ (ดู @media print ใน qrcode.css) --}}
+                        <div class="qr-url-group" style="margin-top: 12px; width: 100%; text-align: left;">
                             <label style="font-size: 11px; color: #718096; display: block; margin-bottom: 4px; font-weight: 500;">ลิงก์ URL สำหรับประเมิน:</label>
                             <div style="display: flex; gap: 6px;">
                                 <input type="text" id="{{ $inputId }}" value="{{ $evaluationUrl }}" readonly style="flex: 1; font-size: 11px; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; color: #4a5568; outline: none;">
@@ -119,7 +126,7 @@
                                 <i class="fas fa-qrcode"></i>
                             </div>
                         </div>
-                        <div class="qr-title">เคาน์เตอร์ {{ $sub->counter_sub_id }}</div>
+                        <div class="qr-title">{{ $counterLabel }}</div>
                         <div class="qr-subtitle">ปิดให้บริการ</div>
                         <div class="btn-disabled">
                             <i class="fas fa-lock"></i> ปิดใช้งาน
@@ -164,24 +171,34 @@
                 });
         }
 
+        // [แก้ไข ระดับ 4] ใช้ navigator.clipboard (API ปัจจุบัน) และถอยไปใช้ execCommand บนเบราว์เซอร์เก่า
+        // เดิม: ใช้ document.execCommand('copy') อย่างเดียว ซึ่งเป็น API ที่เลิกสนับสนุนแล้ว
         function copyUrl(inputId, event) {
             const inputElement = document.getElementById(inputId);
             if (!inputElement) return;
+            const btn = event.currentTarget;
+
+            const onCopied = () => {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check" style="color: #48bb78;"></i>';
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                }, 1500);
+                showToast();
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(inputElement.value)
+                    .then(onCopied)
+                    .catch(() => alert('ไม่สามารถคัดลอกลิงก์ได้'));
+                return;
+            }
 
             inputElement.select();
             inputElement.setSelectionRange(0, 99999);
-
             try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    const btn = event.currentTarget;
-                    const originalHTML = btn.innerHTML;
-                    btn.innerHTML = '<i class="fas fa-check" style="color: #48bb78;"></i>';
-                    setTimeout(() => {
-                        btn.innerHTML = originalHTML;
-                    }, 1500);
-
-                    showToast();
+                if (document.execCommand('copy')) {
+                    onCopied();
                 } else {
                     alert('ไม่สามารถคัดลอกลิงก์ได้');
                 }

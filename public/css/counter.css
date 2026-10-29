@@ -1,74 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
-/* =========================================
-   Layout & Sidebar Structure Fix
-   ========================================= */
-body {
-    display: flex !important;
-    min-height: 100vh !important;
-    align-items: stretch !important;
-    overflow-x: hidden;
-}
+/* =========================================================================
+   counter.css — สไตล์เฉพาะหน้าจัดการเคาน์เตอร์
+   [แก้ไข ระดับ 4] ย้ายส่วนที่ใช้ร่วมกันไปไว้ที่ layout.css แล้ว
+   ส่วนที่ลบออก: @import ฟอนต์, "Layout & Sidebar Structure Fix", * (reset), body,
+                 Sidebar ทั้งหมด, .content, "บังคับให้ Sidebar ยาวเต็มจอ", "ดันเนื้อหาหลัก",
+                 "ปุ่ม Logout", "User Profile Sidebar Section"
+   ส่วนที่คงไว้: .header-row / .page-title / .btn ของหน้านี้ (ค่าต่างจาก layout.css เล็กน้อย จึงกำหนดทับไว้)
+   ========================================================================= */
 
-.sidebar {
-    width: 240px !important;
-    flex-shrink: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 100vh !important;
-    height: auto !important;
-    align-self: stretch !important;
-}
-
-.content {
-    flex: 1 !important;
-    min-width: 0 !important;
-    padding: 28px 32px !important;
-    box-sizing: border-box !important;
-}
-
-.logout-btn {
-    margin-top: auto !important;
-    color: #fff !important;
-    text-decoration: none !important;
-    padding: 14px 16px 6px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
-    position: sticky !important;
-    bottom: 15px !important;
-}
-
-.logout-btn:hover {
-    opacity: 0.85;
-}
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Sarabun', sans-serif;
-}
-
-body {
-    display: flex;
-    min-height: 100vh;
-    background-color: #f2f4f6;
-}
-
-/* Sidebar */
-.sidebar { width: 260px; background-color: #FFCC00; padding: 20px 0; display: flex; flex-direction: column; }
-.sidebar-logo { text-align: center; margin-bottom: 30px; padding: 0 20px; }
-.sidebar-logo img { width: 120px; background: rgba(0,0,0,0.1); border-radius: 50%; padding: 10px; }
-.menu-category { color: #b38f00; font-size: 14px; font-weight: 600; padding: 10px 30px; margin-top: 10px; }
-.menu-item { display: block; padding: 12px 30px; color: #4a4a4a; text-decoration: none; font-weight: 500; font-size: 16px; transition: 0.3s; }
-.menu-item:hover { background-color: rgba(255, 255, 255, 0.2); }
-.menu-item.active { background-color: #ffffff; color: #FFCC00; border-radius: 0 30px 30px 0; margin-right: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-.logout-btn { margin-top: auto; padding: 20px 30px; color: #ffffff; text-decoration: none; font-weight: 500; border-top: 1px solid rgba(255,255,255,0.3); }
-
-/* Main Content */
-.content { flex: 1; padding: 40px; overflow-y: auto; }
+/* Main Content (ค่าเฉพาะหน้านี้ ทับค่าตั้งต้นใน layout.css) */
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
 .page-title h1 { font-size: 24px; color: #1a202c; margin-bottom: 5px; }
 .page-title p { color: #718096; font-size: 14px; }
@@ -81,7 +20,8 @@ body {
 .btn-outline { background-color: #fff; border: 1px solid #cbd5e0; color: #4a5568; }
 
 /* Table */
-.table-card { background-color: #ffffff; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+/* [แก้ไข ระดับ 4] เพิ่ม overflow-x: auto ให้ตารางเลื่อนแนวนอนได้บนจอแคบ (เดิมดันเกินขอบขวา) */
+.table-card { background-color: #ffffff; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; padding: 15px 10px; color: #a0aec0; font-size: 13px; font-weight: 600; border-bottom: 1px solid #edf2f7; text-transform: uppercase; }
 td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
@@ -105,7 +45,8 @@ td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middl
 
 /* Modal */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); display: none; justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background: white; width: 100%; max-width: 650px; border-radius: 15px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+/* [แก้ไข ระดับ 4] จำกัดความสูงและให้เลื่อนในตัวได้ — เดิมถ้ามีจุดย่อยเยอะ ปุ่มบันทึกด้านล่างหลุดนอกจอ */
+.modal-content { background: white; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; border-radius: 15px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; }
 .modal-header h2 { font-size: 20px; color: #1a202c; }
 .modal-header p { font-size: 14px; color: #718096; margin-top: 5px; }
@@ -146,145 +87,3 @@ td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middl
 .delete-box h4 { color: #e53e3e; font-size: 15px; margin-bottom: 4px; font-weight: 600; }
 .delete-box p { color: #f56565; font-size: 13px; }
 .btn-delete { background: #ffffff; color: #e53e3e; border: 1px solid #feb2b2; padding: 8px 15px; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; gap: 5px; align-items: center; font-family: 'Sarabun', sans-serif; font-size: 13px; }
-
-/* บังคับให้ Sidebar ยาวเต็มจอเสมอแม้เลื่อนหน้าจอลงมาด้านล่าง */
-.sidebar {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    bottom: 0 !important;
-    height: 100vh !important;
-    min-height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    z-index: 100 !important;
-}
-
-/* ดันเนื้อหาหลักไม่ให้ทับกับ Sidebar ที่ถูกตรึงไว้ */
-.content {
-    margin-left: 240px !important; /* ถ้าความกว้าง sidebar ของคุณคือ 240px หรือ 250px ให้ปรับตัวเลขนี้ให้ตรงกันครับ */
-    min-height: 100vh !important;
-}
-
-/* ปุ่ม Logout เกาะติดขอบล่างสุดเสมอ */
-.logout-btn {
-    margin-top: auto !important;
-    color: #fff !important;
-    text-decoration: none !important;
-    padding: 14px 16px 6px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
-}
-.logout-btn:hover {
-    opacity: 0.85;
-}
-
-/* =========================================
-   User Profile Sidebar Section
-========================================= */
-.sidebar {
-    position: relative; /* สำคัญ: เพื่อให้กล่องโปรไฟล์เกาะอยู่ด้านล่างสุดของ Sidebar ได้ */
-    padding-bottom: 80px; /* เว้นที่ว่างด้านล่างไม่ให้เมนูอื่นๆ โดนโปรไฟล์บัง */
-}
-
-.user-profile-container {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.user-profile-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 15px 20px;
-    color: #333;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.user-profile-toggle:hover {
-    background-color: rgba(0, 0, 0, 0.08);
-}
-
-.avatar {
-    width: 38px;
-    height: 38px;
-    background-color: #fff;
-    color: #e5a900;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 16px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    flex-shrink: 0;
-}
-
-.user-info {
-    flex: 1;
-    overflow: hidden;
-}
-
-.user-name {
-    font-size: 14px;
-    font-weight: 700;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-}
-
-.user-role {
-    font-size: 12px;
-    color: #555;
-}
-
-.profile-dropdown-menu {
-    display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    width: 100%;
-    background-color: #fff;
-    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
-    z-index: 100;
-}
-
-.profile-dropdown-menu.show {
-    display: block;
-}
-
-.dropdown-item {
-    display: flex;
-    align-items: center;
-    padding: 15px 20px;
-    color: #333;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 600;
-    transition: background 0.2s;
-}
-
-.dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
-.dropdown-item.text-danger {
-    color: #e53e3e;
-}
-
-.chevron-icon {
-    transition: transform 0.3s;
-}
-
-.user-profile-container.open .chevron-icon {
-    transform: rotate(180deg);
-}

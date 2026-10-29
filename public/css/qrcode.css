@@ -1,11 +1,15 @@
-/* =========================================
-   Global & QR Code Section
-========================================= */
-body { 
-    background-color: #eef2f6; 
-    font-family: 'Sarabun', sans-serif; 
-}
+/* =========================================================================
+   qrcode.css — สไตล์เฉพาะหน้า QR Code
+   [แก้ไข ระดับ 4]
+   - ย้าย "User Profile Sidebar Section" (รวม .sidebar { padding-bottom: 80px !important }) ไปไว้ที่ layout.css
+   - หน้านี้เลิกโหลด schedule.css แล้ว
+   - สีพื้นหลังใช้ค่าเดียวกับทุกหน้า (เดิม #eef2f6 ต่างจากหน้าอื่นที่เป็น #f2f4f6 สลับหน้าแล้วพื้นหลังกะพริบ)
+   - เพิ่ม @media print สำหรับพิมพ์ QR ไปติดหน้าเคาน์เตอร์
+   ========================================================================= */
 
+/* =========================================
+   QR Code Section
+========================================= */
 .qr-header { margin-bottom: 30px; }
 .qr-header h1 { font-size: 24px; font-weight: 700; color: #1a202c; margin-bottom: 5px; }
 .qr-header p { color: #a0aec0; font-size: 14px; margin: 0; }
@@ -105,136 +109,46 @@ body {
     opacity: 0.5;
 }
 
-/* =========================================
-   User Profile Sidebar Section
-========================================= */
-/* เว้นที่ว่างด้านล่างของเมนู ไม่ให้แถบโปรไฟล์ไปบังเมนูอื่น */
-.sidebar {
-    padding-bottom: 80px !important; 
-}
-
-/* กล่องโปรไฟล์เกาะอยู่ด้านล่างสุดของหน้าจอ */
-.user-profile-container {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-    z-index: 10;
-}
-
-.user-profile-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 15px 20px;
-    color: #333;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.user-profile-toggle:hover {
-    background-color: rgba(0, 0, 0, 0.08);
-}
-
-.avatar {
-    width: 38px;
-    height: 38px;
-    background-color: #fff;
-    color: #e5a900;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 16px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    flex-shrink: 0;
-}
-
-.user-info {
-    flex: 1;
-    overflow: hidden;
-}
-
-.user-name {
-    font-size: 14px;
-    font-weight: 700;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-}
-
-.user-role {
-    font-size: 12px;
-    color: #555;
-}
-
-.profile-dropdown-menu {
-    display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    width: 100%;
-    background-color: #fff;
-    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
-    z-index: 100;
-}
-
-.profile-dropdown-menu.show {
-    display: block;
-}
-
-.dropdown-item {
-    display: flex;
-    align-items: center;
-    padding: 15px 20px;
-    color: #333;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 600;
-    transition: background 0.2s;
-}
-
-.dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
-.dropdown-item.text-danger {
-    color: #e53e3e;
-}
-
-.chevron-icon {
-    transition: transform 0.3s;
-}
-
-.user-profile-container.open .chevron-icon {
-    transform: rotate(180deg);
-}
-
 #copy-toast {
-            position: fixed;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-20px);
-            background: #2f855a;
-            color: #fff;
-            padding: 12px 24px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            font-size: 14px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            z-index: 9999;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        }
-        #copy-toast.show {
-            opacity: 1;
-            visibility: visible;
-            transform: translateX(-50%) translateY(0);
-        }
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: #2f855a;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+#copy-toast.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* [เพิ่มใหม่ ระดับ 4] พิมพ์ QR ทุกจุดได้ในครั้งเดียว (Ctrl+P)
+   เดิม: พิมพ์แล้วได้ทั้ง sidebar สีเหลือง ช่องลิงก์ และปุ่มต่าง ๆ ติดไปด้วย
+   ใหม่: เหลือเฉพาะรูป QR + ชื่อเคาน์เตอร์ + ตำแหน่ง และไม่พิมพ์จุดที่ปิดใช้งาน */
+@media print {
+    .sidebar,
+    .qr-header,
+    .btn-download,
+    .qr-url-group,
+    .qr-card.disabled,
+    #copy-toast { display: none !important; }
+
+    body { background: #fff; display: block; }
+    .content { margin-left: 0; padding: 0; }
+    .qr-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .qr-card { break-inside: avoid; box-shadow: none; border: 1px solid #cbd5e0; }
+    .qr-subtitle { color: #4a5568; }
+}

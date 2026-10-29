@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>แดชบอร์ด — ระบบประเมินความพึงพอใจ</title>
-    <link rel="stylesheet" href="{{ asset('css/schedule.css') }}?v={{ time() }}">
-    <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ time() }}">
+    {{-- [แก้ไข ระดับ 4] ใช้ layout.css แทน schedule.css
+         เดิม: <link ... css/schedule.css> — โหลดทั้งไฟล์ของหน้าตารางเพื่อเอาแค่ layout
+               แต่ติดกฎ table { min-width: 1000px } มาด้วย ทำให้คอลัมน์สถานะในตารางสถานะเคาน์เตอร์ถูกตัดหาย --}}
+    <link rel="stylesheet" href="{{ asset('css/layout.css') }}?v={{ filemtime(public_path('css/layout.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ filemtime(public_path('css/dashboard.css')) }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {{-- [แก้ไข ระดับ 4] ล็อกเวอร์ชัน Chart.js
+         เดิม: https://cdn.jsdelivr.net/npm/chart.js — โหลดเวอร์ชันล่าสุดเสมอ ถ้าออก major version ใหม่ กราฟอาจพังเองโดยไม่มีใครแก้โค้ด --}}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 @php
@@ -68,7 +73,8 @@
         <div class="header-row">
             <div class="page-title">
                 <h1>Dashboard Overview</h1>
-                <p>Manage and resolve support tickets</p>
+                {{-- [แก้ไข ระดับ 4] เดิม: "Manage and resolve support tickets" — ข้อความที่หลงมาจาก template ไม่เกี่ยวกับระบบนี้ --}}
+                <p>ภาพรวมคะแนนความพึงพอใจและสถานะเคาน์เตอร์</p>
             </div>
             <div class="action-buttons">
                 <form action="{{ url('/dashboard') }}" method="GET" id="periodForm" style="margin: 0;">
@@ -82,9 +88,13 @@
                         </select>
                     </div>
                 </form>
+                {{-- [แก้ไข ระดับ 4] ซ่อนปุ่ม Export จากพนักงาน
+                     เดิม: พนักงานเห็นปุ่มนี้ แต่ route ส่งออกรายงานจำกัดเฉพาะผู้ดูแล กดแล้วเจอหน้า 403 --}}
+                @unless($isEmployee)
                 <a href="{{ route('report.export.index') }}" class="btn btn-yellow" style="text-decoration: none;">
                     <i class="fas fa-download"></i> Export
                 </a>
+                @endunless
             </div>
         </div>
 
@@ -140,7 +150,8 @@
                                 <th style="width: 18%;">COUNTER</th>
                                 <th style="width: 26%;">STAFF ปัจจุบัน</th>
                                 <th style="width: 18%;">เวลา</th>
-                                <th style="width: 14%; text-align: center;">คะแนนวันนี้</th>
+                                {{-- [แก้ไข ระดับ 4] เดิม: "คะแนนวันนี้" — แต่ค่าในคอลัมน์เปลี่ยนตามช่วงเวลาที่เลือก --}}
+                                <th style="width: 14%; text-align: center;">คะแนน</th>
                                 <th style="width: 10%; text-align: center;">ประเมิน</th>
                                 <th style="width: 14%; text-align: right;">สถานะ</th>
                             </tr>
@@ -408,14 +419,15 @@
                             stepSize: 1,
                             precision: 0,
                             color: '#a0aec0',
-                            font: { family: 'Prompt', size: 11 }
+                            // [แก้ไข ระดับ 4] เดิม: 'Prompt' — ฟอนต์ที่หน้านี้ไม่ได้โหลด จึงได้ฟอนต์สำรองของเบราว์เซอร์
+                            font: { family: 'Sarabun', size: 11 }
                         },
                         grid: { color: '#f1f5f9' }
                     },
                     x: {
                         ticks: {
                             color: '#718096',
-                            font: { family: 'Prompt', size: 11 }
+                            font: { family: 'Sarabun', size: 11 }
                         },
                         grid: { display: false }
                     }

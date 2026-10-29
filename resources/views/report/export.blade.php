@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ส่งออกรายงาน</title>
-    <link rel="stylesheet" href="{{ asset('css/export.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/schedule.css') }}?v={{ time() }}">
+    {{-- [แก้ไข ระดับ 4] โหลด layout.css แล้วตามด้วย export.css และเลิกโหลด schedule.css
+         เดิม: export.css (ไม่มี ?v=) แล้วตามด้วย schedule.css ทำให้ .form-control ของหน้านี้ถูกทับ --}}
+    <link rel="stylesheet" href="{{ asset('css/layout.css') }}?v={{ filemtime(public_path('css/layout.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/export.css') }}?v={{ filemtime(public_path('css/export.css')) }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -72,8 +74,16 @@
             <p>เลือกประเภทไฟล์ ช่วงเวลา และเคาน์เตอร์ที่ต้องการ</p>
         </div>
 
+        {{-- [เพิ่มใหม่ ระดับ 4] แสดง error จาก Controller
+             เดิม: หน้านี้ไม่แสดง error เลย เช่น เลือก "กำหนดช่วงเอง" แล้วไม่ใส่วันที่ หน้าจะโหลดใหม่เฉย ๆ โดยไม่มีไฟล์และไม่บอกเหตุผล --}}
+        @if($errors->any())
+            <div role="alert" style="background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 600; max-width: 900px;">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
         <div class="export-card">
-            <form action="{{ route('report.export.download') }}" method="POST">
+            <form action="{{ route('report.export.download') }}" method="POST" id="export-form" onsubmit="return handleExportSubmit()">
                 @csrf
 
                 <!-- 1. ประเภทไฟล์ -->
@@ -107,7 +117,8 @@
                                 </svg>
                             </div>
                             <div class="file-info">
-                                <h4>Excel Report</h4>
+                                {{-- [แก้ไข ระดับ 4] เดิม: "Excel Report" — ไฟล์ที่ได้จริงเป็น .csv (เปิดใน Excel ได้) --}}
+                                <h4>Excel Report (.csv)</h4>
                             </div>
                         </label>
                     </div>
@@ -140,14 +151,16 @@
                     <div class="counter-header">
                         <h3>3. เคาน์เตอร์</h3>
                         <label class="checkbox-label">
-                            <input type="checkbox" name="select_all" id="select_all" onchange="toggleSelectAll()"> เลือกทั้งหมด
+                            {{-- [แก้ไข ระดับ 4] ติ๊ก "เลือกทั้งหมด" ไว้ตั้งแต่เปิดหน้า
+                                 เดิม: ไม่ติ๊กอะไรเลย ซึ่ง Controller ตีความว่า "ทุกเคาน์เตอร์" ผู้ใช้จึงไม่รู้ว่าจะได้ข้อมูลทั้งหมด --}}
+                            <input type="checkbox" name="select_all" id="select_all" onchange="toggleSelectAll()" checked> เลือกทั้งหมด
                         </label>
                     </div>
                     
                     <div class="counter-grid">
                         @foreach($counters as $counter)
                             <label class="counter-card">
-                                <input type="checkbox" name="counters[]" value="{{ $counter->counter_id }}" class="counter-checkbox">
+                                <input type="checkbox" name="counters[]" value="{{ $counter->counter_id }}" class="counter-checkbox" checked>
                                 <div class="counter-info">
                                     <h4>เคาน์เตอร์ {{ $counter->counter_id }}</h4>
                                     <p>{{ $counter->counter_location }}</p> 
@@ -157,7 +170,8 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn-export" style="color: white;">
+                {{-- [แก้ไข ระดับ 4] ลบ style="color: white;" ออก (สีตัวอักษรกำหนดใน export.css แล้ว) และเพิ่ม id --}}
+                <button type="submit" class="btn-export" id="btn-export-submit">
                     <i class="fas fa-download"></i> Export ไฟล์
                 </button>
 
@@ -169,7 +183,12 @@
         function toggleCustomDate() {
             const val = document.getElementById('time_range').value;
             const customBox = document.getElementById('custom_date_box');
-            customBox.style.display = (val === 'custom') ? 'flex' : 'none';
+            const isCustom = (val === 'custom');
+            customBox.style.display = isCustom ? 'flex' : 'none';
+
+            // [แก้ไข ระดับ 4] บังคับกรอกวันที่เมื่อเลือก "กำหนดช่วงเอง"
+            document.getElementById('start_date').required = isCustom;
+            document.getElementById('end_date').required = isCustom;
         }
 
         // ฟังก์ชันควบคุมความสมเหตุสมผลของวันที่ (ไม่ให้เลือก "ถึงวันที่" ก่อนหน้า "จากวันที่")
@@ -198,6 +217,30 @@
                 }
             });
         });
+
+        // ===== [เพิ่มใหม่ ระดับ 4] ตรวจก่อนส่ง + กันกดซ้ำระหว่างรอสร้างไฟล์ =====
+        // เดิม: ไม่ติ๊กเคาน์เตอร์เลยก็ส่งได้ (ได้ข้อมูลทุกเคาน์เตอร์โดยไม่ตั้งใจ)
+        //       และการสร้าง PDF ใช้เวลาหลายวินาที ผู้ใช้มักกดซ้ำจนเซิร์ฟเวอร์สร้างไฟล์ซ้อนกัน
+        function handleExportSubmit() {
+            const selectAll = document.getElementById('select_all').checked;
+            const anyCounter = document.querySelector('.counter-checkbox:checked');
+            if (!selectAll && !anyCounter) {
+                alert('กรุณาเลือกเคาน์เตอร์อย่างน้อย 1 เคาน์เตอร์ หรือกด "เลือกทั้งหมด"');
+                return false;
+            }
+
+            const btn = document.getElementById('btn-export-submit');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังสร้างไฟล์...';
+
+            // การดาวน์โหลดไฟล์ไม่ทำให้หน้าเปลี่ยน จึงเปิดปุ่มกลับเองหลังผ่านไปครู่หนึ่ง
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-download"></i> Export ไฟล์';
+            }, 8000);
+            return true;
+        }
+        // ===== [จบ ส่วนตรวจก่อนส่ง] =====
     </script>
 
     <script>

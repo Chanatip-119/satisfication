@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Evaluation;
 use App\Models\Counter;
+use App\Models\CounterSub; // [แก้ไข ระดับ 4] ใช้ชื่อเคาน์เตอร์รูปแบบกลาง
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -160,7 +161,9 @@ class ExportReportController extends Controller
             return 'จุดบริการ ID ' . $schedule->counter_sub_id;
         }
 
-        return 'เคาน์เตอร์ ' . $counter->counter_id . ' — ' . $counter->counter_location;
+        // [แก้ไข ระดับ 4] ใช้รหัสจุดย่อยรูปแบบกลาง เช่น "เคาน์เตอร์ 8.1 — บริการเคาน์เตอร์ชั้น 6"
+        // เดิม [ระดับ 3 ข้อ 15]: 'เคาน์เตอร์ ' . $counter->counter_id . ' — ' . location (ไม่บอกว่าจุดย่อยไหน)
+        return CounterSub::labelFor($schedule->counter_sub_id) . ' — ' . $counter->counter_location;
     }
     // ===== [จบ ข้อ 15: counterLabel] =====
 

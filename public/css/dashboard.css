@@ -1,48 +1,10 @@
-/* =========================================
-   Layout & Sidebar Structure Fix
-   ========================================= */
-body {
-    display: flex !important;
-    min-height: 100vh !important;
-    align-items: stretch !important;
-    overflow-x: hidden;
-}
-
-.sidebar {
-    width: 240px !important;
-    flex-shrink: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 100vh !important;
-    height: auto !important;
-    align-self: stretch !important;
-}
-
-.content {
-    flex: 1 !important;
-    min-width: 0 !important;
-    padding: 28px 32px !important;
-    box-sizing: border-box !important;
-}
-
-.logout-btn {
-    margin-top: auto !important;
-    color: #fff !important;
-    text-decoration: none !important;
-    padding: 14px 16px 6px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
-    position: sticky !important;
-    bottom: 15px !important;
-}
-
-.logout-btn:hover {
-    opacity: 0.85;
-}
+/* =========================================================================
+   dashboard.css — สไตล์เฉพาะหน้าแดชบอร์ด
+   [แก้ไข ระดับ 4]
+   - ย้าย "Layout & Sidebar Structure Fix" และ "User Profile Sidebar Section" ไปไว้ที่ layout.css
+   - หน้าแดชบอร์ดเลิกโหลด schedule.css แล้ว (เดิมโหลดเพื่อใช้ layout แต่ติดกฎ table { min-width: 1000px }
+     ของหน้าตารางมาด้วย ทำให้คอลัมน์ "สถานะ" ในตารางสถานะเคาน์เตอร์ถูกตัดหายบนจอโน้ตบุ๊ก)
+   ========================================================================= */
 
 /* =========================================
    Header & Period Filter
@@ -560,7 +522,7 @@ body {
    ========================================= */
 @media screen and (max-width: 1600px) {
     .content {
-        padding: 22px 24px !important;
+        padding: 22px 24px;
     }
     .dashboard-main-grid {
         grid-template-columns: minmax(0, 1.95fr) minmax(280px, 1fr);
@@ -577,108 +539,13 @@ body {
     }
 }
 
-/* =========================================
-   User Profile Sidebar Section
-========================================= */
-.sidebar {
-    position: relative; /* สำคัญ: เพื่อให้กล่องโปรไฟล์เกาะอยู่ด้านล่างสุดของ Sidebar ได้ */
-    padding-bottom: 80px; /* เว้นที่ว่างด้านล่างไม่ให้เมนูอื่นๆ โดนโปรไฟล์บัง */
+/* [เพิ่มใหม่ ระดับ 4] Responsive สำหรับจอเล็กกว่าโน้ตบุ๊ก
+   เดิม: มีจุดแบ่งแค่ 1600px การ์ด KPI ยังเป็น 4 คอลัมน์ และ layout หลักยังเป็น 2 คอลัมน์แม้บนแท็บเล็ต */
+@media screen and (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-.user-profile-container {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.user-profile-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 15px 20px;
-    color: #333;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.user-profile-toggle:hover {
-    background-color: rgba(0, 0, 0, 0.08);
-}
-
-.avatar {
-    width: 38px;
-    height: 38px;
-    background-color: #fff;
-    color: #e5a900;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 16px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    flex-shrink: 0;
-}
-
-.user-info {
-    flex: 1;
-    overflow: hidden;
-}
-
-.user-name {
-    font-size: 14px;
-    font-weight: 700;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-}
-
-.user-role {
-    font-size: 12px;
-    color: #555;
-}
-
-.profile-dropdown-menu {
-    display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    width: 100%;
-    background-color: #fff;
-    box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
-    z-index: 100;
-}
-
-.profile-dropdown-menu.show {
-    display: block;
-}
-
-.dropdown-item {
-    display: flex;
-    align-items: center;
-    padding: 15px 20px;
-    color: #333;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 600;
-    transition: background 0.2s;
-}
-
-.dropdown-item:hover {
-    background-color: #f8f9fa;
-}
-
-.dropdown-item.text-danger {
-    color: #e53e3e;
-}
-
-.chevron-icon {
-    transition: transform 0.3s;
-}
-
-.user-profile-container.open .chevron-icon {
-    transform: rotate(180deg);
+@media screen and (max-width: 900px) {
+    .dashboard-main-grid,
+    .dashboard-bottom-grid { grid-template-columns: minmax(0, 1fr); }
 }

@@ -7,7 +7,7 @@ use App\Models\CounterSub;
 use App\Models\Checkin;
 use App\Models\Evaluation;
 use App\Models\Staff;
-use App\Models\Qr_Code;
+// [แก้ไข ระดับ 4] ลบ use App\Models\Qr_Code; — ไม่มี Model นี้ในโปรเจกต์และไม่ได้ถูกใช้
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter; // [แก้ไข ระดับ 1 ข้อ 4] ใช้กันการกดส่งประเมินซ้ำ
 use Carbon\Carbon;
@@ -29,6 +29,12 @@ class EvaluationController extends Controller
             abort(404, 'กรุณาสแกน QR Code ประจำเคาน์เตอร์เพื่อทำการประเมิน');
         }
 
+        // [แก้ไข ระดับ 4] ชื่อเคาน์เตอร์ที่ผู้รับบริการเข้าใจได้ เช่น "เคาน์เตอร์ 8.1 — บริการเคาน์เตอร์ชั้น 6"
+        // เดิม: 'เคาน์เตอร์ ' . $counter_sub_id (เช่น "เคาน์เตอร์ 7" ซึ่งไม่ตรงกับชื่อที่ติดไว้หน้าเคาน์เตอร์)
+        $counterSub = CounterSub::with('counter')->find($counter_sub_id);
+        $counterName = CounterSub::labelFor($counter_sub_id)
+            . ($counterSub && $counterSub->counter ? ' — ' . $counterSub->counter->counter_location : '');
+
         // ค้นหา Check-in ของเคาน์เตอร์นี้ ที่ยังไม่ Check-out, ต้องเป็นของวันนี้เท่านั้น และดึงคนล่าสุด
         $activeCheckin = Checkin::whereHas('schedule', function($query) use ($counter_sub_id) {
             $query->where('counter_sub_id', $counter_sub_id);
@@ -42,7 +48,7 @@ class EvaluationController extends Controller
         if (!$activeCheckin) {
             return view('evaluation.create', [
                 'is_closed' => true,
-                'counter_name' => 'เคาน์เตอร์ ' . $counter_sub_id,
+                'counter_name' => $counterName,
                 'counter_sub_id' => $counter_sub_id // ส่งค่ากลับไปด้วยป้องกัน Error Undefined variable
             ]);
         }
@@ -52,7 +58,7 @@ class EvaluationController extends Controller
             'is_closed' => false,
             'checkin_id' => $activeCheckin->checkin_id,
             'counter_sub_id' => $counter_sub_id,
-            'counter_name' => 'เคาน์เตอร์ ' . $counter_sub_id
+            'counter_name' => $counterName
         ]);
     }
 
