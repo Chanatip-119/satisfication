@@ -19,62 +19,22 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
+        // [สิทธิ์ตามบทบาท] Employee ดูหน้าแดชบอร์ดไม่ได้ — พาไปหน้าตารางปฏิบัติงานแทน
+        // ใช้ redirect แทนหน้า 403 เพราะหลังล็อกอิน / กดโลโก้ / ปุ่มในหน้า 403 ระบบจะพามาที่ /dashboard
+        // ถ้าตอบ 403 พนักงานจะติดอยู่หน้าข้อผิดพลาดทุกครั้งที่เข้าระบบ
+        if (auth()->user()?->isEmployee()) {
+            return redirect()->route('schedule.index');
+        }
+
         $period   = $request->query('period', 'today');
         $nowBkk   = Carbon::now('Asia/Bangkok');
         $todayStr = $nowBkk->format('Y-m-d');
         $nowTime  = $nowBkk->format('H:i:s');
 
-        try {
-            if (class_exists(Checkin::class)) {
-                $expiredCheckins = Checkin::whereNull('checkout_at')->get();
-                foreach ($expiredCheckins as $ck) {
-                    try {
-                        $sch = $ck->schedule_id ? Schedule::find($ck->schedule_id) : null;
-                        
-                        if (!$sch && $ck->staff_id) {
-                            $sch = Schedule::where('staff_id', $ck->staff_id)
-                                           ->whereDate('schedule_date', '<=', $todayStr)
-                                           ->orderBy('schedule_date', 'desc')
-                                           ->first();
-                        }
-
-                        if ($sch) {
-                            $schDate = Carbon::parse($sch->schedule_date)->format('Y-m-d');
-                            $endStr = Carbon::parse($sch->end_time)->format('H:i:s');
-                            $schEndDT = Carbon::parse($schDate . ' ' . $endStr, 'Asia/Bangkok');
-                            
-                            if ($nowBkk->greaterThanOrEqualTo($schEndDT)) {
-                                $ck->checkout_at = $nowBkk;
-                                $checkinAt = $ck->checkin_at ? Carbon::parse($ck->checkin_at) : $schEndDT->copy()->subMinutes(30);
-                                $ck->duration_min = $nowBkk->diffInMinutes($checkinAt);
-                                $ck->is_kicked = 1;
-                                $ck->save();
-                                
-                                $sch->status = 'empty';
-                                $sch->save();
-                            }
-                        }
-                    } catch (\Exception $e) { continue; }
-                }
-            }
-            
-            $schedulesToClear = Schedule::whereDate('schedule_date', '<=', $todayStr)
-                                        ->whereNotIn('status', ['empty', 'close', 'sick'])
-                                        ->get();
-                                        
-            foreach ($schedulesToClear as $stc) {
-                try {
-                    $schDate = Carbon::parse($stc->schedule_date)->format('Y-m-d');
-                    $endStr = Carbon::parse($stc->end_time)->format('H:i:s');
-                    $schEndDT = Carbon::parse($schDate . ' ' . $endStr, 'Asia/Bangkok');
-                    
-                    if ($nowBkk->greaterThanOrEqualTo($schEndDT)) {
-                        $stc->status = 'empty';
-                        $stc->save();
-                    }
-                } catch (\Exception $e) { continue; }
-            }
-        } catch (\Exception $e) {}
+        // [Check-in ฟีเจอร์ใหม่] Check-out อัตโนมัติ + รีเซ็ตสถานะกะ ผ่าน Service กลาง
+        // เดิม: วน checkout ทุกคนที่หมดเวลาเองที่นี่ (ซ้ำกับ CheckinController) และ Check-out คนที่ต่อเวลาด้วย
+        // ตอนนี้ Scheduler (counters:monitor) ทำงานนี้ทุกนาที ที่นี่เป็นตัวสำรองถ้า Scheduler ยังไม่ได้ตั้ง
+        \App\Services\CheckinService::runHousekeeping();
 
         $counters = Counter::with('countersubs')->where('is_active', true)->get();
         $staffMap = Staff::all()->keyBy('staff_id');

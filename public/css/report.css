@@ -23,9 +23,8 @@ th { text-align: center; padding: 12px 10px; color: #4a5568; font-size: 13px; fo
 th:first-child, td:first-child { text-align: left; }
 td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middle; font-size: 14px; color: #2d3748; }
 
-.rating-badge { padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; display: inline-block; }
-.rating-good { background-color: #d1fae5; color: #065f46; } 
-.rating-bad { background-color: #fef3c7; color: #92400e; } 
+/* [สีคะแนน] ลบ .rating-badge / .rating-good / .rating-bad (สี 2 ระดับ: ≥4 เขียว, <4 เหลือง)
+   ใช้ .score-pill + .score-high / .score-mid / .score-low จาก layout.css แทน (3 ระดับ เหมือนทุกหน้า) */
 .rating-none { color: #a0aec0; }
 
 .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }

@@ -24,6 +24,8 @@
         </div>
         <div class="menu-category">หลัก</div>
         <a href="{{ url('/dashboard') }}" class="menu-item active">แดชบอร์ด</a>
+        {{-- [Check-in ฟีเจอร์ใหม่ ข้อ 1] เมนูการแจ้งเตือน (แสดงเฉพาะ Executive / Super_Admin / Admin) --}}
+        @include('partials.notification-bell')
         <a href="{{ route('schedule.index') }}" class="menu-item">ตารางปฏิบัติงาน</a>
         <a href="{{ route('report.counter') }}" class="menu-item">รายงานเคาน์เตอร์</a>
         <a href="{{ route('report.staff') }}" class="menu-item">รายงาน Staff</a>

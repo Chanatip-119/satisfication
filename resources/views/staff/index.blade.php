@@ -12,6 +12,8 @@
 <body>
 @php
     $isEmployee = auth()->check() && auth()->user()->isEmployee();
+    // [สิทธิ์ตามบทบาท] เฉพาะ Executive (ตำแหน่งสูงสุด) เท่านั้นที่กดเปิดดู PIN ได้
+    $isExecutive = auth()->check() && auth()->user()->isExecutive();
 @endphp
 
     <aside class="sidebar">
@@ -20,7 +22,10 @@
         </div>
 
         <div class="menu-category">หลัก</div>
-        <a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>
+        {{-- [สิทธิ์ตามบทบาท] Employee ไม่เห็นเมนูแดชบอร์ด --}}
+        @unless($isEmployee)<a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>@endunless
+        {{-- [Check-in ฟีเจอร์ใหม่ ข้อ 1] เมนูการแจ้งเตือน (แสดงเฉพาะ Executive / Super_Admin / Admin) --}}
+        @include('partials.notification-bell')
         <a href="{{ route('schedule.index') }}" class="menu-item {{ Route::is('schedule.index') ? 'active' : '' }}">ตารางปฏิบัติงาน</a>
         <a href="{{ route('report.counter') }}" class="menu-item {{ Route::is('report.counter') ? 'active' : '' }}">รายงานเคาน์เตอร์</a>
         <a href="{{ route('report.staff') }}" class="menu-item {{ Route::is('report.staff') ? 'active' : '' }}">รายงาน Staff</a>
@@ -163,17 +168,31 @@
                         </td>
                         @unless($isEmployee)
                         <td>
+                            {{-- [สีคะแนน] สีตามระดับคะแนน (เขียว / เหลือง / แดง) เหมือนทุกหน้า
+                                 เดิม: <span class="badge" style="background: #c6f6d5; ...">  — เขียวทุกค่า แม้คะแนนต่ำ --}}
                             @if($staff->avg_rating !== '-')
-                                <span class="badge" style="background: #c6f6d5; color: #22543d; font-weight: 600;">{{ $staff->avg_rating }}</span>
+                                <span class="score-pill {{ \App\Models\Evaluation::scoreClass($staff->avg_rating) }}">{{ $staff->avg_rating }}</span>
                             @else
-                                <span class="text-green">-</span>
+                                <span class="score-none">—</span>
                             @endif
                         </td>
                         @endunless
                         @unless($isEmployee)
+                        {{-- ===== [สิทธิ์ตามบทบาท] PIN ในตารางแสดงเป็น ●●●● =====
+                             เดิม: {{ $staff->staff_pincode }} แสดง PIN จริงให้ทุกคนที่ไม่ใช่ Employee
+                             ใหม่: ทุกคนเห็น ●●●● มีแค่ Executive ที่มีปุ่มรูปตา และมี PIN จริงอยู่ในหน้าเว็บ
+                                   (คนอื่นไม่มี PIN อยู่ใน HTML เลย ดู source ก็ไม่เห็น) --}}
                         <td>
-                            {{ $staff->staff_pincode }}
+                            <span style="display: inline-flex; align-items: center; gap: 8px;">
+                                @if($isExecutive)
+                                    <span class="pin-mask" data-pin="{{ $staff->staff_pincode }}" data-revealed="0" style="letter-spacing: 3px; font-weight: 600;">●●●●</span>
+                                    <button type="button" onclick="toggleTablePin(this)" title="แสดง PIN" style="background: none; border: 1px solid #e2e8f0; border-radius: 6px; padding: 3px 6px; cursor: pointer; color: #718096; display: inline-flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+                                @else
+                                    <span class="pin-mask" style="letter-spacing: 3px; font-weight: 600;">●●●●</span>
+                                @endif
+                            </span>
                         </td>
+                        {{-- ===== [จบ สิทธิ์ตามบทบาท: PIN ในตาราง] ===== --}}
                         @endunless
                         <td>
                             @php $isActive = ($staff->status ?? 'Inactive') === 'Active'; @endphp
@@ -191,9 +210,15 @@
                                 @endif
                             @else
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <select class="dropdown-box role-select" data-staff-id="{{ $staff->staff_id }}" style="padding: 5px 10px; font-size: 13px; height: 32px;">
+                                {{-- [สิทธิ์ตามบทบาท] คนที่ไม่ใช่ Executive เปลี่ยนสิทธิ์ของ Executive ไม่ได้ และตั้งใครเป็น Executive ไม่ได้
+                                     (กันการเลื่อนตัวเองเป็น Executive เพื่อดู PIN — Controller ตรวจซ้ำอีกชั้น) --}}
+                                @php
+                                    $rowIsExecutive = $staff->role && strcasecmp($staff->role->role_name, \App\Models\Staff::ROLE_EXECUTIVE_NAME) === 0;
+                                @endphp
+                                <select class="dropdown-box role-select" data-staff-id="{{ $staff->staff_id }}" style="padding: 5px 10px; font-size: 13px; height: 32px;" {!! (!$isExecutive && $rowIsExecutive) ? 'disabled title="เฉพาะ Executive เท่านั้นที่เปลี่ยนสิทธิ์นี้ได้"' : '' !!}>
                                     @foreach($roles as $role)
-                                    <option value="{{ $role->role_id }}" {{ (int) $staff->role_id === (int) $role->role_id ? 'selected' : '' }}>{{ $role->role_name }}</option>
+                                    @php $optionIsExecutive = strcasecmp($role->role_name, \App\Models\Staff::ROLE_EXECUTIVE_NAME) === 0; @endphp
+                                    <option value="{{ $role->role_id }}" {{ (int) $staff->role_id === (int) $role->role_id ? 'selected' : '' }} {{ (!$isExecutive && $optionIsExecutive && !$rowIsExecutive) ? 'disabled' : '' }}>{{ $role->role_name }}</option>
                                     @endforeach
                                 </select>
 
@@ -266,10 +291,13 @@
         <div class="sp-content">
             <div id="sp-tab-overview" class="sp-section active">
                 <div class="sp-stats-grid">
+                    {{-- [สิทธิ์ตามบทบาท] Employee ไม่เห็นคะแนนเฉลี่ยใน Side Panel --}}
+                    @unless($isEmployee)
                     <div class="sp-stat-box">
                         <div class="sp-stat-title">คะแนนเฉลี่ย</div>
                         <div class="sp-stat-val text-green" id="sp-avg-rating">-</div>
                     </div>
+                    @endunless
                     <div class="sp-stat-box">
                         <div class="sp-stat-title">Check-in ทั้งหมด</div>
                         <div class="sp-stat-val" id="sp-total-checkins">0</div>
@@ -294,9 +322,16 @@
                         <span class="sp-info-val" id="sp-time-range">-</span>
                     </div>
                     @unless($isEmployee)
+                    {{-- [สิทธิ์ตามบทบาท] PIN แสดงเป็น ●●●● เฉพาะ Executive มีปุ่มกดเปิดดู
+                         เดิม: <span id="sp-pin">-</span> แสดง PIN จริงให้ทุกคนที่ไม่ใช่ Employee --}}
                     <div class="sp-info-item">
                         <span class="sp-info-label">PIN Code</span>
-                        <span class="sp-info-val" id="sp-pin">-</span>
+                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            <span class="sp-info-val" id="sp-pin" style="letter-spacing: 3px; font-weight: 600;">●●●●</span>
+                            @if($isExecutive)
+                            <button type="button" id="sp-pin-toggle" onclick="togglePanelPin()" title="แสดง/ซ่อน PIN" style="background: none; border: 1px solid #e2e8f0; border-radius: 6px; padding: 3px 6px; cursor: pointer; color: #718096; display: inline-flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+                            @endif
+                        </span>
                     </div>
                     @endunless
                 </div>
@@ -384,7 +419,8 @@
                     <div class="role-selector">
                         @foreach($roles as $role)
                         <label class="role-radio">
-                            <input type="radio" name="role_id" value="{{ $role->role_id }}" {{ (int) $role->role_id === \App\Models\Staff::ROLE_EMPLOYEE ? 'checked' : '' }}>
+                            {{-- [สิทธิ์ตามบทบาท] เฉพาะ Executive เท่านั้นที่สร้างบุคลากรระดับ Executive ได้ --}}
+                            <input type="radio" name="role_id" value="{{ $role->role_id }}" {{ (int) $role->role_id === \App\Models\Staff::ROLE_EMPLOYEE ? 'checked' : '' }} {{ (!$isExecutive && strcasecmp($role->role_name, \App\Models\Staff::ROLE_EXECUTIVE_NAME) === 0) ? 'disabled' : '' }}>
                             <div class="radio-card">
                                 <span class="radio-circle"></span>
                                 {{ $role->role_name }}
@@ -508,6 +544,41 @@
         }
         // ===== [จบ ข้อ 1: escapeHtml] =====
 
+        // ===== [สิทธิ์ตามบทบาท] PIN ใน Side Panel แสดงเป็น ●●●● เสมอ =====
+        // เซิร์ฟเวอร์ส่ง PIN มาให้เฉพาะ Executive (ดู StaffController::show) คนอื่นจะได้ null
+        // Executive กดปุ่มรูปตาเพื่อสลับระหว่าง ●●●● กับ PIN จริง
+        let currentPanelPin = null;
+
+        function togglePanelPin() {
+            const pinEl = document.getElementById('sp-pin');
+            if (!pinEl || !currentPanelPin) return;
+            const show = pinEl.dataset.revealed !== '1';
+            pinEl.innerText = show ? currentPanelPin : '●●●●';
+            pinEl.dataset.revealed = show ? '1' : '0';
+        }
+        // ===== [จบ สิทธิ์ตามบทบาท: PIN ใน Side Panel] =====
+
+        // [สีคะแนน] สีตัวเลขคะแนนเฉลี่ยใน Side Panel ใช้เกณฑ์เดียวกับป้ายในตาราง
+        // (≥ 4.0 เขียว | 3.0–3.9 เหลือง | < 3.0 แดง | ไม่มีคะแนน เทา)
+        function scoreColor(value) {
+            const score = parseFloat(value);
+            if (isNaN(score)) return '#a0aec0';
+            if (score >= 4) return '#047857';
+            if (score >= 3) return '#b45309';
+            return '#dc2626';
+        }
+
+        // ===== [สิทธิ์ตามบทบาท] ปุ่มรูปตาในตาราง (มีเฉพาะ Executive) =====
+        function toggleTablePin(btn) {
+            const mask = btn.parentElement.querySelector('.pin-mask');
+            if (!mask || !mask.dataset.pin) return;
+            const show = mask.dataset.revealed !== '1';
+            mask.innerText = show ? mask.dataset.pin : '●●●●';
+            mask.dataset.revealed = show ? '1' : '0';
+            btn.title = show ? 'ซ่อน PIN' : 'แสดง PIN';
+        }
+        // ===== [จบ สิทธิ์ตามบทบาท: PIN ในตาราง] =====
+
         function openModal(modalId) {
             const m = document.getElementById(modalId);
             if(m) m.style.display = 'flex';
@@ -623,7 +694,9 @@
             
             document.getElementById('sp-name').innerText = "กำลังโหลดข้อมูล...";
             document.getElementById('sp-code').innerText = "BUU-...";
-            document.getElementById('sp-avg-rating').innerText = "-";
+            // [สิทธิ์ตามบทบาท] กล่องคะแนนเฉลี่ยไม่มีในหน้าของ Employee จึงต้องเช็คก่อน
+            const avgElReset = document.getElementById('sp-avg-rating');
+            if (avgElReset) avgElReset.innerText = "-";
             document.getElementById('sp-total-checkins').innerText = "-";
             document.getElementById('sp-total-comments').innerText = "-";
             document.getElementById('sp-current-counter').innerText = "-";
@@ -649,12 +722,22 @@
                 document.getElementById('sp-name').innerText = data.name || '-';
                 document.getElementById('sp-code').innerText = data.code || '-';
                 
+                // [สิทธิ์ตามบทบาท] ไม่แสดง PIN จริงทันที เก็บไว้ให้ Executive กดเปิดดูเอง
+                currentPanelPin = data.pin || null;
                 const pinEl = document.getElementById('sp-pin');
                 if (pinEl) {
-                    pinEl.innerText = data.pin || '-';
+                    pinEl.innerText = '●●●●';
+                    pinEl.dataset.revealed = '0';
                 }
+                const pinToggle = document.getElementById('sp-pin-toggle');
+                if (pinToggle) pinToggle.style.display = currentPanelPin ? '' : 'none';
 
-                document.getElementById('sp-avg-rating').innerText = data.avg_rating || '-';
+                // [สิทธิ์ตามบทบาท] กล่องคะแนนเฉลี่ยไม่มีในหน้าของ Employee
+                const avgEl = document.getElementById('sp-avg-rating');
+                if (avgEl) {
+                    avgEl.innerText = data.avg_rating || '-';
+                    avgEl.style.color = scoreColor(data.avg_rating); // [สีคะแนน] เดิม: เขียวเสมอ (class text-green)
+                }
                 document.getElementById('sp-total-checkins').innerText = data.total_checkins ?? 0;
                 document.getElementById('sp-total-comments').innerText = data.total_comments ?? 0;
                 document.getElementById('sp-current-counter').innerText = data.current_counter || '-';

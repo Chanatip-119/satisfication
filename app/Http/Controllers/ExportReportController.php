@@ -14,12 +14,18 @@ class ExportReportController extends Controller
 {
     public function index()
     {
+        // [สิทธิ์ตามบทบาท] Employee ส่งออกรายงานไม่ได้ (route กันด้วย can:manage-admin อยู่แล้ว ตรวจซ้ำอีกชั้นเผื่อ Gate ถูกแก้)
+        abort_if(auth()->user()?->isEmployee(), 403);
+
         $counters = Counter::where('is_active', true)->get();
         return view('report.export', compact('counters'));
     }
 
     public function export(Request $request)
     {
+        // [สิทธิ์ตามบทบาท] ตรวจซ้ำอีกชั้นเหมือน index()
+        abort_if(auth()->user()?->isEmployee(), 403);
+
         $request->validate([
             'export_type' => 'required|in:pdf,excel',
             // [แก้ไข ระดับ 3 ข้อ 15] รับเฉพาะช่วงเวลาที่มีในหน้าเว็บ

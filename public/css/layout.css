@@ -162,3 +162,26 @@ body {
 
 .chevron-icon { transition: transform 0.3s; }
 .user-profile-container.open .chevron-icon { transform: rotate(180deg); }
+
+/* =========================================
+   [สีคะแนน] ป้ายคะแนนเฉลี่ย — สีเดียวกันทุกหน้า
+   เดิม: แต่ละหน้ามีชุดสีของตัวเอง (.badge เขียวในหน้าบุคลากร, .rating-good/.rating-bad ในหน้ารายงาน,
+         .score-* ในแดชบอร์ด) ตอนนี้รวมไว้ที่นี่ที่เดียว
+   เกณฑ์ (กำหนดใน App\Models\Evaluation::scoreClass):
+     ≥ 4.0 เขียว | 3.0–3.9 เหลือง | < 3.0 แดง
+   ========================================= */
+.score-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    min-width: 42px;
+}
+
+.score-high { background: #e6fffa; color: #047857; }
+.score-mid  { background: #fef3c7; color: #b45309; }
+.score-low  { background: #fee2e2; color: #dc2626; }
+
+.score-none { color: #a0aec0; }

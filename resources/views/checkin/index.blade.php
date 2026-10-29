@@ -162,6 +162,37 @@
             </div>
         </div>
 
+        {{-- ===== [Check-in ฟีเจอร์ใหม่ ข้อ 2] ต่อเวลา ===== --}}
+        {{-- ค่าปัจจุบันไว้ให้สคริปต์เทียบว่ามีการเปลี่ยนแปลง (เช่น ถึงช่วงที่ต่อเวลาได้) แล้วโหลดหน้าใหม่ --}}
+        <div id="checkin-meta" hidden data-end="{{ $counter->time_end }}" data-can-extend="{{ $extension->can_extend ? '1' : '0' }}"></div>
+
+        @if($extension->is_extended)
+        <div class="alert-box" style="border-left-color: #3182ce; background: #ebf8ff;">
+            <div class="alert-title" style="color: #2b6cb0;">⏱ ต่อเวลาแล้ว ถึง {{ $extension->extended_label }} น.</div>
+            <div class="alert-text" style="color: #2c5282;">ระบบจะไม่ Check-out ให้อัตโนมัติ — ก่อนออกจากเคาน์เตอร์ต้องกด Check-out เองทุกครั้ง</div>
+        </div>
+        @endif
+
+        @if($extension->can_extend)
+        <form action="{{ route('checkin.extend') }}" method="POST"
+              onsubmit="return confirm('ยืนยันต่อเวลา? เมื่อต่อเวลาแล้วต้องกด Check-out เองเท่านั้น ระบบจะไม่ Check-out ให้อัตโนมัติ');"
+              style="margin-bottom: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+            @csrf
+            <input type="hidden" name="checkin_id" value="{{ $current_checkin_id }}">
+            <div style="font-weight: 700; color: #2d3748; margin-bottom: 4px;">ต่อเวลาปฏิบัติงาน</div>
+            <div style="font-size: 13px; color: #718096; margin-bottom: 12px;">เหลือเวลาอีก {{ $extension->minutes_left }} นาที (หมดเวลา {{ $counter->time_end }} น.)</div>
+            <div style="display: flex; gap: 10px;">
+                <select name="hours" style="flex: 1; padding: 12px; border: 1.5px solid #cbd5e0; border-radius: 10px; font-size: 15px; font-family: inherit; background: #fff;">
+                    @foreach($extension->options as $hours)
+                        <option value="{{ $hours }}">ต่อ {{ $hours }} ชั่วโมง (ถึง {{ \Carbon\Carbon::createFromFormat('H:i', $counter->time_end)->addHours($hours)->format('H:i') }} น.)</option>
+                    @endforeach
+                </select>
+                <button type="submit" class="btn btn-primary" style="width: auto; padding: 12px 20px;">ต่อเวลา</button>
+            </div>
+        </form>
+        @endif
+        {{-- ===== [จบ ข้อ 2: ต่อเวลา] ===== --}}
+
         <button type="button" class="btn btn-primary" style="margin-bottom: 12px;" onclick="document.getElementById('reviewsModal').classList.add('active')">ดูรีวิวของฉันทั้งหมด</button>
         <button type="button" class="btn btn-danger" onclick="document.getElementById('checkoutModal').classList.add('active')">➔ Check-out</button>
         @endif
@@ -182,13 +213,20 @@
             <div style="text-align: center; margin-bottom: 24px;">
                 <div class="success-icon" style="background-color: #F5F6F8; color: #4a5568;">🕒</div>
                 <h2 class="title" style="margin-bottom: 8px;">Check-out หรือยัง?</h2>
+                {{-- [Check-in ฟีเจอร์ใหม่ ข้อ 2] ถ้าต่อเวลาแล้ว ไม่มี Auto Check-out --}}
+                @if($extension->is_extended)
+                <p class="subtitle" style="font-size: 13px; line-height: 1.5;">คุณต้องการ Check-out จาก {{ $counter->name }} ใช่หรือไม่?<br>คุณต่อเวลาไว้ ระบบจะไม่ Check-out ให้อัตโนมัติ</p>
+                @else
                 <p class="subtitle" style="font-size: 13px; line-height: 1.5;">คุณต้องการ Check-out จาก {{ $counter->name }} ใช่หรือไม่?<br>หากไม่ยืนยัน ระบบจะ Auto Check-out เมื่อหมดเวลา</p>
+                @endif
             </div>
 
+            @unless($extension->is_extended)
             <div class="alert-box">
                 <div class="alert-title">⚠️ Auto Check-out</div>
                 <div class="alert-text">ระบบจะทำการ Check-out อัตโนมัติเมื่อถึงเวลา {{ $counter->time_end }} น. หากคุณไม่กด Check-out ด้วยตัวเอง</div>
             </div>
+            @endunless
 
             <form action="{{ route('checkin.checkout') }}" method="POST">
                 @csrf
@@ -426,6 +464,14 @@
                 // หมดเวลากะ หรือถูกคนอื่น Check-in รับช่วงต่อ → กลับหน้าแรก
                 if (!data.active) {
                     window.location.replace(homeUrl);
+                    return;
+                }
+
+                // [Check-in ฟีเจอร์ใหม่ ข้อ 2] เวลาสิ้นสุดเปลี่ยน หรือถึงช่วงที่ต่อเวลาได้ → โหลดหน้าใหม่ทั้งหน้า เพื่อแสดง/ซ่อนปุ่มต่อเวลา
+                const meta = document.getElementById('checkin-meta');
+                if (meta && ((data.end && data.end !== meta.dataset.end)
+                    || (typeof data.can_extend !== 'undefined' && (data.can_extend ? '1' : '0') !== meta.dataset.canExtend))) {
+                    window.location.reload();
                     return;
                 }
 

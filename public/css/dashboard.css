@@ -240,19 +240,7 @@
     padding: 25px !important;
 }
 
-.score-pill {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-    text-align: center;
-    min-width: 42px;
-}
-
-.score-high { background: #e6fffa; color: #047857; }
-.score-mid  { background: #fef3c7; color: #b45309; }
-.score-low  { background: #fee2e2; color: #dc2626; }
+/* [สีคะแนน] .score-pill / .score-high / .score-mid / .score-low ย้ายไปไว้ที่ layout.css แล้ว (ใช้ร่วมกันทุกหน้า) */
 
 .status-pill {
     display: inline-flex;

@@ -19,7 +19,10 @@
     </div>
 
     <div class="menu-category">หลัก</div>
-    <a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>
+    {{-- [สิทธิ์ตามบทบาท] Employee ไม่เห็นเมนูแดชบอร์ด --}}
+        @unless($isEmployee)<a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>@endunless
+        {{-- [Check-in ฟีเจอร์ใหม่ ข้อ 1] เมนูการแจ้งเตือน (แสดงเฉพาะ Executive / Super_Admin / Admin) --}}
+        @include('partials.notification-bell')
     <a href="{{ route('schedule.index') }}" class="menu-item {{ Route::is('schedule.*') ? 'active' : '' }}">ตารางปฏิบัติงาน</a>
     <a href="{{ route('report.counter') }}" class="menu-item {{ Route::is('report.counter') ? 'active' : '' }}">รายงานเคาน์เตอร์</a>
     <a href="{{ route('report.staff') }}" class="menu-item {{ Route::is('report.staff') ? 'active' : '' }}">รายงาน Staff</a>

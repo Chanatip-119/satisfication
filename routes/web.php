@@ -10,6 +10,7 @@ use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ExportReportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\NotificationController; // [Check-in ฟีเจอร์ใหม่ ข้อ 1]
 
 // =========================================================================
 // 1. เส้นทางสาธารณะสำหรับ Guest (ยังไม่ได้เข้าสู่ระบบ)
@@ -63,6 +64,8 @@ Route::post('/checkin/step2', [CheckinController::class, 'step2'])->name('checki
 Route::post('/checkin/step3', [CheckinController::class, 'step3'])->name('checkin.step3');
 // หมายเหตุ: Check-out ได้เฉพาะเครื่องที่ใช้ Check-in ตรวจใน CheckinController::checkout() [ระดับ 1 ข้อ 7]
 Route::post('/checkin/checkout', [CheckinController::class, 'checkout'])->name('checkin.checkout');
+// [Check-in ฟีเจอร์ใหม่ ข้อ 2] ต่อเวลา (กดได้เฉพาะเครื่องที่ใช้ Check-in ตรวจใน CheckinController::extend)
+Route::post('/checkin/extend', [CheckinController::class, 'extend'])->name('checkin.extend');
 
 // =========================================================================
 // 3. เส้นทางที่ต้องผ่านการเข้าสู่ระบบเท่านั้น (Protected Routes)
@@ -86,6 +89,13 @@ Route::middleware('auth')->group(function () {
     // เหตุผล: GET ไม่ผ่านการตรวจ CSRF แค่เปิดลิงก์หรือรูปภาพที่ชี้มา URL นี้ก็ลบกะได้ทันที
     Route::post('/schedule/import', [ScheduleController::class, 'importExcel'])->middleware('can:manage-admin')->name('schedule.import');
     Route::get('/schedule/download-template', [ScheduleController::class, 'downloadTemplate'])->name('schedule.downloadTemplate');
+    // [Check-in ฟีเจอร์ใหม่ ข้อ 3/4] หัวหน้าบังคับ Check-out (เมื่อพนักงานลืม Check-out แล้วเครื่องเดิมใช้ไม่ได้)
+    Route::post('/schedule/checkin/{checkin_id}/force-checkout', [ScheduleController::class, 'forceCheckout'])->middleware('can:manage-admin')->name('schedule.forceCheckout');
+
+    // [Check-in ฟีเจอร์ใหม่ ข้อ 1] การแจ้งเตือนในเว็บ (Employee เข้าไม่ได้ — ตรวจใน NotificationController)
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readAll');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'read'])->name('notifications.read');
 
     // จัดการบุคลากร (Staff)
     Route::middleware('can:manage-admin')->group(function () {

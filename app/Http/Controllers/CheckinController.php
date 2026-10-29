@@ -11,6 +11,7 @@ use App\Models\Evaluation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter; // [แก้ไข ระดับ 1 ข้อ 4] ใช้จำกัดการเดา PIN
+use App\Services\CheckinService; // [Check-in ฟีเจอร์ใหม่] ตรรกะเวลา / Check-out อัตโนมัติ / ต่อเวลา
 use Carbon\Carbon;
 
 class CheckinController extends Controller
@@ -35,21 +36,28 @@ class CheckinController extends Controller
         $counterName = CounterSub::labelFor($counterId);
         $locationName = ($counterSub && $counterSub->counter) ? $counterSub->counter->counter_location : 'ไม่ระบุตำแหน่ง';
 
+        // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 2] เวลาสิ้นสุดจริง (รวมเวลาที่ต่อแล้ว) และข้อมูลปุ่มต่อเวลา =====
+        $checkin->loadMissing('schedule');
+        $extension = CheckinService::extensionInfo($checkin);
+        $effectiveEnd = CheckinService::effectiveEnd($checkin);
+
         $counterObj = (object)[
             'name'     => $counterName,
             'location' => $locationName,
-            'time_end' => $schedule ? substr($schedule->end_time, 0, 5) : '-',
+            // เดิม: substr($schedule->end_time, 0, 5) — ไม่รวมเวลาที่ต่อ
+            'time_end' => $effectiveEnd ? $effectiveEnd->format('H:i') : '-',
         ];
+        // ===== [จบ ข้อ 2: renderStep4View] =====
 
         $staffObj = (object)[
             'name' => $staff ? $staff->staff_name : '-',
         ];
 
+        // [Check-in ฟีเจอร์ใหม่ ข้อ 2] แถบเตือน 15 นาทีอิงเวลาสิ้นสุดจริง (ถ้าต่อเวลาแล้วจะเตือนก่อนเวลาที่ต่อไว้)
         $showWarningBar = false;
-        if ($schedule) {
-            $endStr = date('H:i:s', strtotime($schedule->end_time));
-            $timeEnd = Carbon::parse($schedule->schedule_date . ' ' . $endStr, 'Asia/Bangkok');
-            $showWarningBar = $nowBkk->diffInMinutes($timeEnd, false) <= 15 && $nowBkk->isBefore($timeEnd);
+        if ($effectiveEnd) {
+            $showWarningBar = $nowBkk->isBefore($effectiveEnd)
+                && CheckinService::minutesBetween($nowBkk, $effectiveEnd) <= 15;
         }
 
         $evaluations = collect([]);
@@ -114,7 +122,8 @@ class CheckinController extends Controller
             'show_warning_bar'   => $showWarningBar,
             'review_stats'       => $reviewStats,
             'review_filters'     => collect([]),
-            'reviews'            => $reviewsList
+            'reviews'            => $reviewsList,
+            'extension'          => $extension, // [Check-in ฟีเจอร์ใหม่ ข้อ 2]
         ]);
     }
 
@@ -123,41 +132,10 @@ class CheckinController extends Controller
         $nowBkk = Carbon::now('Asia/Bangkok');
         $todayAuto = $nowBkk->format('Y-m-d');
 
-        try {
-            if (class_exists(Checkin::class)) {
-                $expiredCheckins = Checkin::whereNull('checkout_at')->get();
-                foreach ($expiredCheckins as $ck) {
-                    $sch = $ck->schedule_id ? Schedule::find($ck->schedule_id) : null;
-                    if ($sch) {
-                        $endStr = date('H:i:s', strtotime($sch->end_time));
-                        $schEndDT = Carbon::parse($sch->schedule_date . ' ' . $endStr, 'Asia/Bangkok');
-                        
-                        if ($nowBkk->greaterThanOrEqualTo($schEndDT)) {
-                            $ck->checkout_at = $nowBkk;
-                            $checkinAt = $ck->checkin_at ? Carbon::parse($ck->checkin_at) : $schEndDT->copy()->subMinutes(30);
-                            $ck->duration_min = $nowBkk->diffInMinutes($checkinAt);
-                            $ck->is_kicked = 1;
-                            $ck->save();
-                            
-                            $sch->status = 'empty';
-                            $sch->save();
-                        }
-                    }
-                }
-            }
-
-            $schedulesToClear = Schedule::whereDate('schedule_date', '<=', $todayAuto)
-                                        ->whereNotIn('status', ['empty', 'close', 'sick'])
-                                        ->get();
-            foreach ($schedulesToClear as $stc) {
-                $endStr = date('H:i:s', strtotime($stc->end_time));
-                $schEndDT = Carbon::parse($stc->schedule_date . ' ' . $endStr, 'Asia/Bangkok');
-                if ($nowBkk->greaterThanOrEqualTo($schEndDT)) {
-                    $stc->status = 'empty';
-                    $stc->save();
-                }
-            }
-        } catch (\Exception $e) {}
+        // [Check-in ฟีเจอร์ใหม่] Check-out อัตโนมัติ + รีเซ็ตสถานะกะ ผ่าน Service กลาง
+        // เดิม: เขียนโค้ดวน checkout ไว้ที่นี่เอง (ซ้ำกับ DashboardController) และ Check-out คนที่ต่อเวลาด้วย
+        // ตอนนี้ Scheduler (counters:monitor) ทำงานนี้ทุกนาทีอยู่แล้ว ที่นี่เป็นตัวสำรองถ้า Scheduler ยังไม่ได้ตั้ง
+        CheckinService::runHousekeeping();
 
         if ($request->has('active_checkin_id')) {
             // ===== [แก้ไข ระดับ 1 ข้อ 7] เปิดหน้าขั้นที่ 4 ได้เฉพาะเครื่องที่ใช้ Check-in นั้นเท่านั้น =====
@@ -296,6 +274,15 @@ class CheckinController extends Controller
         }
         // ===== [จบ ข้อ 4: step2] =====
 
+        // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 4] PIN นี้ยัง Check-in ค้างอยู่ที่เคาน์เตอร์อื่น → บล็อก =====
+        // ปิดของที่หมดเวลาไปก่อน เพื่อไม่บล็อกคนที่กะเดิมจบไปแล้ว (Check-out อัตโนมัติยังไม่ทันทำงาน)
+        CheckinService::runHousekeeping();
+        $activeElsewhere = CheckinService::activeCheckinElsewhere((int) $staff->staff_id, (int) $counterSub->counter_sub_id);
+        if ($activeElsewhere) {
+            return back()->withErrors(['pin' => $this->activeElsewhereMessage($activeElsewhere)]);
+        }
+        // ===== [จบ ข้อ 4: step2] =====
+
         $nowBkk = Carbon::now('Asia/Bangkok');
         $todayAuto = $nowBkk->format('Y-m-d');
         
@@ -389,6 +376,13 @@ class CheckinController extends Controller
         $scheduleId = (int) $confirmation['schedule_id'];
         $todayAuto = $nowBkk->format('Y-m-d');
 
+        // [Check-in ฟีเจอร์ใหม่ ข้อ 4] ตรวจซ้ำอีกครั้งก่อนบันทึก (เผื่อระหว่างหน้ายืนยัน มีการ Check-in ที่เครื่องอื่น)
+        $activeElsewhere = CheckinService::activeCheckinElsewhere($staffId, $counterId);
+        if ($activeElsewhere) {
+            return redirect()->route('checkin.index')
+                ->withErrors(['pin' => $this->activeElsewhereMessage($activeElsewhere)]);
+        }
+
         $newCheckin = DB::transaction(function () use ($counterId, $staffId, $scheduleId, $nowBkk, $todayAuto) {
             // ล็อกเคาน์เตอร์เพื่อไม่ให้การส่งเวรที่เกิดพร้อมกันสร้างผู้ปฏิบัติงานซ้อนกัน
             $counterSub = CounterSub::where('counter_sub_id', $counterId)
@@ -463,16 +457,9 @@ class CheckinController extends Controller
                 ->get();
 
             foreach ($activeOtherCheckins as $activeOtherCheckin) {
-                $activeOtherCheckin->checkout_at = $nowBkk;
-                $activeOtherCheckin->duration_min = $nowBkk->diffInMinutes(Carbon::parse($activeOtherCheckin->checkin_at));
-                $activeOtherCheckin->is_kicked = 1;
-                $activeOtherCheckin->save();
-
-                if ($activeOtherCheckin->schedule_id) {
-                    Schedule::where('schedule_id', $activeOtherCheckin->schedule_id)
-                        ->where('status', 'checkin')
-                        ->update(['status' => 'empty']);
-                }
+                // [Check-in ฟีเจอร์ใหม่ ข้อ 3] บันทึกเหตุผลว่า "ถูกรับช่วงต่อ" (ใช้แสดงในไทม์ไลน์ประวัติ)
+                // เดิม: ตั้ง checkout_at / duration_min / is_kicked เอง (duration อาจติดลบใน Carbon 3)
+                CheckinService::closeCheckin($activeOtherCheckin, Checkin::REASON_TAKEOVER, $nowBkk);
             }
 
             $checkinSchedule = $schedule;
@@ -554,15 +541,8 @@ class CheckinController extends Controller
             ->first();
 
         if ($checkin) {
-            $checkin->checkout_at = $nowBkk;
-            $checkin->duration_min = $nowBkk->diffInMinutes(Carbon::parse($checkin->checkin_at));
-            $checkin->is_kicked = 0;
-            $checkin->save();
-
-            if ($checkin->schedule_id) {
-                Schedule::where('schedule_id', $checkin->schedule_id)
-                    ->update(['status' => 'empty']);
-            }
+            // [Check-in ฟีเจอร์ใหม่ ข้อ 3] ปิดผ่าน Service กลาง และบันทึกเหตุผลว่า "Check-out เอง"
+            CheckinService::closeCheckin($checkin, Checkin::REASON_MANUAL, $nowBkk);
         }
 
         // [แก้ไข ระดับ 1 ข้อ 7] Check-out แล้ว ล้างสิทธิ์ออกจาก session ของเครื่อง
@@ -589,29 +569,23 @@ class CheckinController extends Controller
             return response()->json(['active' => false]);
         }
 
-        $nowBkk = Carbon::now('Asia/Bangkok');
+        $nowBkk = CheckinService::now();
         $showWarning = false;
+        $effectiveEnd = CheckinService::effectiveEnd($checkin);
 
         if ($checkin->schedule) {
-            $endStr = date('H:i:s', strtotime($checkin->schedule->end_time));
-            $scheduleEnd = Carbon::parse($checkin->schedule->schedule_date . ' ' . $endStr, 'Asia/Bangkok');
+            $scheduleEnd = CheckinService::scheduleEnd($checkin->schedule);
 
-            // หมดเวลากะแล้ว: checkout อัตโนมัติเฉพาะ Check-in นี้ (เงื่อนไขเดียวกับใน index())
-            if ($nowBkk->greaterThanOrEqualTo($scheduleEnd)) {
-                $checkin->checkout_at = $nowBkk;
-                $checkin->duration_min = $nowBkk->diffInMinutes(Carbon::parse($checkin->checkin_at));
-                $checkin->is_kicked = 1;
-                $checkin->save();
-
-                $checkin->schedule->status = 'empty';
-                $checkin->schedule->save();
-
+            // หมดเวลากะแล้ว: checkout อัตโนมัติเฉพาะ Check-in นี้
+            // [Check-in ฟีเจอร์ใหม่ ข้อ 2] ยกเว้นคนที่ต่อเวลา — ต้อง Check-out เองเท่านั้น
+            if (!$checkin->manual_checkout_required && $nowBkk->greaterThanOrEqualTo($scheduleEnd)) {
+                CheckinService::closeCheckin($checkin, Checkin::REASON_AUTO, $scheduleEnd);
                 $request->session()->forget('kiosk_checkin_id');
                 return response()->json(['active' => false]);
             }
 
-            // เงื่อนไขเดียวกับแถบแจ้งเตือนในหน้าขั้นที่ 4 (ภายใน 15 นาทีก่อนหมดเวลา)
-            $showWarning = $nowBkk->diffInMinutes($scheduleEnd, false) <= 15;
+            // เงื่อนไขเดียวกับแถบแจ้งเตือนในหน้าขั้นที่ 4 (ภายใน 15 นาทีก่อนเวลาสิ้นสุดจริง)
+            $showWarning = $nowBkk->isBefore($effectiveEnd) && CheckinService::minutesBetween($nowBkk, $effectiveEnd) <= 15;
         }
 
         // นับรีวิวของพนักงานคนนี้ด้วย query เดียว (ขอบเขตเดียวกับ renderStep4View)
@@ -627,7 +601,82 @@ class CheckinController extends Controller
             'total'    => (int) ($stats->total ?? 0),
             'negative' => (int) ($stats->negative ?? 0),
             'warning'  => $showWarning,
+            // [Check-in ฟีเจอร์ใหม่ ข้อ 2] เวลาสิ้นสุดจริง และนาทีที่เหลือ — ใช้ตัดสินว่าต้องโหลดหน้าใหม่เพื่อแสดงปุ่มต่อเวลาหรือไม่
+            'end'      => $effectiveEnd ? $effectiveEnd->format('H:i') : null,
+            'can_extend' => CheckinService::extensionInfo($checkin)->can_extend,
         ]);
     }
     // ===== [จบ ข้อ 17: status] =====
+
+    // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 2] ต่อเวลา =====
+    // - กดได้เมื่อเหลือเวลาไม่เกิน 2 ชั่วโมง
+    // - เลือกต่อ 1 หรือ 2 ชั่วโมง (รวมแล้วไม่เกิน 2 ชั่วโมงหลังเวลาสิ้นสุดกะ)
+    // - ต่อแล้ว = ต้อง Check-out เองเท่านั้น ระบบจะไม่ Check-out ให้อัตโนมัติ
+    // - กดได้เฉพาะจากเครื่องที่ใช้ Check-in (เหมือน Check-out)
+    public function extend(Request $request)
+    {
+        $request->validate([
+            'checkin_id' => 'required|integer',
+            'hours'      => 'required|integer|in:1,2',
+        ], [
+            'hours.in' => 'ต่อเวลาได้ครั้งละ 1 หรือ 2 ชั่วโมง',
+        ]);
+
+        $kioskCheckinId = (int) $request->session()->get('kiosk_checkin_id', 0);
+        if ($kioskCheckinId === 0 || (int) $request->checkin_id !== $kioskCheckinId) {
+            return redirect()->route('checkin.index')
+                ->withErrors(['pin' => 'ไม่สามารถต่อเวลาได้ กรุณาต่อเวลาจากเครื่องที่ใช้ Check-in']);
+        }
+
+        $result = DB::transaction(function () use ($kioskCheckinId, $request) {
+            $checkin = Checkin::with('schedule')
+                ->where('checkin_id', $kioskCheckinId)
+                ->whereNull('checkout_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$checkin || !$checkin->schedule) {
+                return 'ไม่พบการ Check-in ที่กำลังทำงานอยู่';
+            }
+
+            $info = CheckinService::extensionInfo($checkin);
+            $hours = (int) $request->hours;
+
+            if (!$info->can_extend) {
+                return 'ยังต่อเวลาไม่ได้ (ต่อได้เมื่อเหลือเวลาไม่เกิน 2 ชั่วโมง และรวมแล้วไม่เกิน 2 ชั่วโมงหลังเวลากะ)';
+            }
+            if (!in_array($hours, $info->options, true)) {
+                return 'ต่อเวลาได้อีกสูงสุด ' . max($info->options) . ' ชั่วโมง';
+            }
+
+            $checkin->extended_until = CheckinService::effectiveEnd($checkin)->copy()->addHours($hours);
+            $checkin->extended_at = CheckinService::now();
+            $checkin->manual_checkout_required = true;
+            $checkin->save();
+
+            return $checkin;
+        });
+
+        if (is_string($result)) {
+            return back()->withErrors(['pin' => $result]);
+        }
+
+        return redirect()->route('checkin.index', [
+            'active_checkin_id' => $result->checkin_id,
+            'c_id'              => $result->schedule->counter_sub_id,
+        ]);
+    }
+    // ===== [จบ ข้อ 2: extend] =====
+
+    // [Check-in ฟีเจอร์ใหม่ ข้อ 4] ข้อความแจ้งว่า PIN นี้กำลังทำงานอยู่ที่เคาน์เตอร์ไหน
+    private function activeElsewhereMessage(Checkin $checkin): string
+    {
+        $counterLabel = $checkin->schedule
+            ? CounterSub::labelFor($checkin->schedule->counter_sub_id)
+            : 'เคาน์เตอร์อื่น';
+        $since = CheckinService::parse($checkin->checkin_at);
+
+        return "PIN นี้กำลังทำงานอยู่ที่ {$counterLabel} ตั้งแต่ " . ($since ? $since->format('H:i') : '-') . " น. "
+            . "กรุณากลับไป Check-out ที่เคาน์เตอร์นั้นก่อน หรือแจ้งหัวหน้าให้ช่วย Check-out ให้";
+    }
 }

@@ -17,6 +17,27 @@ services:
     networks:
       - libsatisfy_network
 
+  # [Check-in ฟีเจอร์ใหม่] ตัวรัน Laravel Scheduler
+  # เรียก php artisan schedule:run ทุกนาที → counters:monitor
+  # (Check-out อัตโนมัติ + แจ้งเตือนหัวหน้าเมื่อเคาน์เตอร์ว่าง / ต่อเวลาเกินกำหนด)
+  # ใช้ image, โฟลเดอร์โค้ด และ .env ชุดเดียวกับ service laravel
+  scheduler:
+    image: libsatisfy_laravel
+    container_name: libsatisfy-scheduler
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Bangkok
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    command: php artisan schedule:work
+    depends_on:
+      - laravel
+      - db
+    networks:
+      - libsatisfy_network
+
   db:
     image: mysql:8.4
     container_name: libsatisfy-db

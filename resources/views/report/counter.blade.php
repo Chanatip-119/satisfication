@@ -20,7 +20,10 @@
         </div>
 
         <div class="menu-category">หลัก</div>
-        <a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>
+        {{-- [สิทธิ์ตามบทบาท] Employee ไม่เห็นเมนูแดชบอร์ด --}}
+        @unless($isEmployee)<a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>@endunless
+        {{-- [Check-in ฟีเจอร์ใหม่ ข้อ 1] เมนูการแจ้งเตือน (แสดงเฉพาะ Executive / Super_Admin / Admin) --}}
+        @include('partials.notification-bell')
         <a href="{{ route('schedule.index') }}" class="menu-item {{ Route::is('schedule.index') ? 'active' : '' }}">ตารางปฏิบัติงาน</a>
         <a href="{{ route('report.counter') }}" class="menu-item active">รายงานเคาน์เตอร์</a>
         <a href="{{ route('report.staff') }}" class="menu-item">รายงาน Staff</a>
@@ -124,11 +127,12 @@
                             {{-- [เพิ่มเติม ระดับ 3] จุดที่ยังไม่มีการประเมินแสดง "—" สีเทา
                                  เดิม: แสดง "0.0" ในป้ายเดียวกับคะแนนต่ำ ทำให้ดูเหมือนจุดนั้นได้คะแนนแย่ ทั้งที่ยังไม่มีใครประเมิน --}}
                             @if($c->eval_count > 0)
-                                <span class="rating-badge {{ $c->avg_rating >= 4 ? 'rating-good' : 'rating-bad' }}">
+                                {{-- [สีคะแนน] เดิม: rating-good (≥ 4) / rating-bad (< 4) --}}
+                                <span class="score-pill {{ \App\Models\Evaluation::scoreClass($c->avg_rating) }}">
                                     {{ $c->avg_rating }}
                                 </span>
                             @else
-                                <span style="color: #a0aec0;">—</span>
+                                <span class="score-none">—</span>
                             @endif
                         </td>
                         <td>{{ number_format($c->eval_count) }}</td>

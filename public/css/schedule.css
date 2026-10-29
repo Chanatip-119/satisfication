@@ -506,3 +506,19 @@ td:last-child { border-right: none; }
 
 .sch-time.waiting-text { color: #2b6cb0; }
 .sch-time.close-text   { color: #718096; }
+
+/* =========================================
+   [Check-in ฟีเจอร์ใหม่ ข้อ 3] เวลานั่งจริงบนการ์ด + ไทม์ไลน์ประวัติ
+   ========================================= */
+.sch-live { font-size: 11px; color: #276749; font-weight: 600; margin-top: 3px; }
+.sch-actual { font-size: 11px; color: #718096; margin-top: 3px; }
+.sch-extended { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 8px; background: #ebf8ff; color: #2b6cb0; font-weight: 600; }
+
+.h-dot.checkin  { background: #48bb78; }
+.h-dot.checkout { background: #a0aec0; }
+.h-dot.takeover { background: #ed8936; }
+.h-dot.extend   { background: #4299e1; }
+.h-dot.live     { background: #38a169; box-shadow: 0 0 0 3px rgba(56, 161, 105, 0.25); }
+
+.btn-force-checkout { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Sarabun', sans-serif; }
+.btn-force-checkout:hover { background: #fed7d7; }

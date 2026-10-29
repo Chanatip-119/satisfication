@@ -81,6 +81,13 @@ class StaffController extends Controller
             'role_id.exists' => 'ไม่พบบทบาทนี้ในระบบ กรุณารีเฟรชหน้าแล้วเลือกใหม่',
         ]);
 
+        // [สิทธิ์ตามบทบาท] เฉพาะ Executive เท่านั้นที่สร้างบุคลากรระดับ Executive ได้
+        // (ไม่งั้น Admin สร้างบัญชี Executive ให้ตัวเองแล้วล็อกอินไปดู PIN ได้)
+        $executiveRoleId = Staff::executiveRoleId();
+        if (!auth()->user()->isExecutive() && $executiveRoleId !== null && (int) $request->role_id === $executiveRoleId) {
+            return redirect()->back()->withErrors(['role_id' => 'เฉพาะ Executive เท่านั้นที่กำหนดสิทธิ์ Executive ได้'])->withInput();
+        }
+
         $staffIdNum = (int) preg_replace('/[^0-9]/', '', $request->staff_id);
 
         if ($staffIdNum <= 0) {
@@ -179,10 +186,13 @@ class StaffController extends Controller
         return response()->json([
             'name' => $staff->staff_name,
             'code' => 'BUU-' . str_pad($staff->staff_id, 3, '0', STR_PAD_LEFT),
-            'pin' => auth()->user()->isEmployee() ? null : $staff->staff_pincode,
+            // [สิทธิ์ตามบทบาท] ส่ง PIN จริงเฉพาะ Executive คนอื่นได้ null (หน้าเว็บแสดง ●●●●)
+            // เดิม: auth()->user()->isEmployee() ? null : $staff->staff_pincode (Admin ทุกคนเห็น PIN)
+            'pin' => $authUser->isExecutive() ? $staff->staff_pincode : null,
             'department' => $staff->department,
             'position' => $staff->position,
-            'avg_rating' => $avgRating,
+            // [สิทธิ์ตามบทบาท] Employee ไม่เห็นคะแนนเฉลี่ย
+            'avg_rating' => $authUser->isEmployee() ? null : $avgRating,
             'account_status' => $accountStatus,
             'total_checkins' => $checkins->count(),
             'total_comments' => $totalComments,
@@ -208,6 +218,21 @@ class StaffController extends Controller
         ]);
 
         $staff = Staff::findOrFail($id);
+
+        // ===== [สิทธิ์ตามบทบาท] เปลี่ยนสิทธิ์ที่เกี่ยวกับ Executive ได้เฉพาะ Executive =====
+        // กัน 2 กรณี: Admin เลื่อนใคร (รวมถึงตัวเอง) เป็น Executive / Admin ลดสิทธิ์ Executive คนอื่น
+        $executiveRoleId = Staff::executiveRoleId();
+        if (!auth()->user()->isExecutive()
+            && $executiveRoleId !== null
+            && ((int) $staff->role_id === $executiveRoleId || (int) $validated['role_id'] === $executiveRoleId)) {
+            $message = 'เฉพาะ Executive เท่านั้นที่เปลี่ยนสิทธิ์ที่เกี่ยวกับ Executive ได้';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 403);
+            }
+            return redirect()->route('staff.index')->withErrors([$message]);
+        }
+        // ===== [จบ สิทธิ์ตามบทบาท: update] =====
+
         $staff->role_id = $validated['role_id'];
         $staff->save();
 
@@ -221,6 +246,11 @@ class StaffController extends Controller
     public function destroy($id)
     {
         $staff = Staff::findOrFail($id);
+
+        // [สิทธิ์ตามบทบาท] ลบบัญชี Executive ได้เฉพาะ Executive
+        if ($staff->isExecutive() && !auth()->user()->isExecutive()) {
+            return redirect()->route('staff.index')->withErrors(['เฉพาะ Executive เท่านั้นที่ลบบัญชี Executive ได้']);
+        }
 
         DB::transaction(function () use ($staff) {
             // ลบ Evaluation ที่เกี่ยวข้องกับ Checkin ของพนักงานคนนี้
@@ -246,6 +276,10 @@ class StaffController extends Controller
     {
         $staffs = Staff::with('role')->get();
 
+        // [สิทธิ์ตามบทบาท] PIN ในไฟล์ CSV เฉพาะ Executive คนอื่นได้ **** แทน
+        // (ถ้านำไฟล์นี้กลับมา Import ช่อง **** จะถูกมองว่าไม่ได้กรอก PIN และระบบคง PIN เดิมไว้)
+        $canSeePin = auth()->user()->isExecutive();
+
         $filename = 'staff_export_' . date('Y-m-d_His') . '.csv';
 
         $headers = [
@@ -253,7 +287,7 @@ class StaffController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ];
 
-        $callback = function () use ($staffs) {
+        $callback = function () use ($staffs, $canSeePin) {
             $file = fopen('php://output', 'w');
             // BOM for Excel UTF-8
             fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
@@ -275,7 +309,7 @@ class StaffController extends Controller
                     $staff->staff_id,
                     $staff->staff_name,
                     $staff->staff_email,
-                    $staff->staff_pincode,
+                    $canSeePin ? $staff->staff_pincode : '****', // [สิทธิ์ตามบทบาท]
                     $staff->role_id,
                     $staff->role ? $staff->role->role_name : '',
                     $staff->department ?? '',
@@ -459,6 +493,10 @@ class StaffController extends Controller
             }
         }
 
+        // [สิทธิ์ตามบทบาท] ผู้ที่ Import เป็น Executive หรือไม่ (ใช้กับการกำหนดสิทธิ์และข้อความ PIN)
+        $importerIsExecutive = auth()->user()->isExecutive();
+        $executiveRoleId = Staff::executiveRoleId();
+
         $imported = 0;
         $updated = 0;
         $skipped = 0;
@@ -582,6 +620,15 @@ class StaffController extends Controller
                 $staff = Staff::where('staff_email', $staffEmail)->first();
             }
 
+            // ===== [สิทธิ์ตามบทบาท] ไฟล์ Import แก้หรือตั้งสิทธิ์ Executive ได้เฉพาะ Executive =====
+            if (!$importerIsExecutive && $executiveRoleId !== null
+                && ($roleId === $executiveRoleId || ($staff && (int) $staff->role_id === $executiveRoleId))) {
+                $errors[] = "แถวที่ {$rowNum}: เกี่ยวข้องกับสิทธิ์ Executive ซึ่งแก้ได้เฉพาะผู้ใช้ระดับ Executive (ข้าม)";
+                $skipped++;
+                continue;
+            }
+            // ===== [จบ สิทธิ์ตามบทบาท: Import] =====
+
             // ตรวจสอบอีเมลซ้ำกับบุคลากรคนอื่น
             if (!empty($staffEmail)) {
                 $duplicateEmail = Staff::where('staff_email', $staffEmail)
@@ -607,7 +654,10 @@ class StaffController extends Controller
             }
             if (Staff::pinTakenByOther($cleanPin, $staff?->staff_id)) {
                 $newPin = Staff::generateUniquePin();
-                $errors[] = "แถวที่ {$rowNum}: PIN {$cleanPin} ซ้ำกับบุคลากรคนอื่น ระบบสุ่ม PIN ใหม่ให้เป็น {$newPin} (นำเข้าสำเร็จ)";
+                // [สิทธิ์ตามบทบาท] บอกเลข PIN ในข้อความเฉพาะเมื่อผู้ Import เป็น Executive
+                $errors[] = $importerIsExecutive
+                    ? "แถวที่ {$rowNum}: PIN {$cleanPin} ซ้ำกับบุคลากรคนอื่น ระบบสุ่ม PIN ใหม่ให้เป็น {$newPin} (นำเข้าสำเร็จ)"
+                    : "แถวที่ {$rowNum}: PIN ในไฟล์ซ้ำกับบุคลากรคนอื่น ระบบสุ่ม PIN ใหม่ให้แล้ว (ผู้ใช้ระดับ Executive ดู PIN ได้ในหน้าบุคลากร) (นำเข้าสำเร็จ)";
                 $cleanPin = $newPin;
             }
             // ===== [จบ ข้อ 3: PIN ตอน Import] =====
@@ -904,7 +954,7 @@ class StaffController extends Controller
         });
 
         // เดิม: 'Reset PIN Code ทั้งหมดสำเร็จ' — แต่ระบบยังไม่ได้ส่งอีเมล แจ้งให้แอดมินรู้ตามจริง
-        return redirect()->route('staff.index')->with('success', 'Reset PIN Code ทั้งหมดสำเร็จ — ระบบยังไม่ได้ส่ง PIN ทางอีเมล กรุณาแจ้ง PIN ใหม่ให้บุคลากร (ดูได้ในตารางหรือ Export CSV)');
+        return redirect()->route('staff.index')->with('success', 'Reset PIN Code ทั้งหมดสำเร็จ — ระบบยังไม่ได้ส่ง PIN ทางอีเมล กรุณาแจ้ง PIN ใหม่ให้บุคลากร (ผู้ใช้ระดับ Executive ดู PIN ได้ในหน้าบุคลากร)');
         // ===== [จบ ข้อ 3: resetAllPins] =====
     }
 
@@ -914,6 +964,16 @@ class StaffController extends Controller
     public function resetPassword(Request $request, $id)
     {
         $staff = Staff::findOrFail($id);
+
+        // [สิทธิ์ตามบทบาท] รีเซ็ตรหัสผ่านของ Executive ได้เฉพาะ Executive
+        // (ไม่งั้น Admin รีเซ็ตรหัสผ่าน Executive แล้วล็อกอินแทนเพื่อดู PIN ได้)
+        if ($staff->isExecutive() && !auth()->user()->isExecutive()) {
+            $message = 'เฉพาะ Executive เท่านั้นที่รีเซ็ตรหัสผ่านของ Executive ได้';
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 403);
+            }
+            return redirect()->route('staff.index')->withErrors([$message]);
+        }
 
         if ($request->reset_type === 'custom') {
             $request->validate([

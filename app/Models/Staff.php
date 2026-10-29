@@ -49,6 +49,34 @@ class Staff extends Authenticatable
         return (int) $this->role_id === self::ROLE_EMPLOYEE;
     }
 
+    // ===== [สิทธิ์ตามบทบาท] ตำแหน่งสูงสุด Executive =====
+    // ตรวจจากชื่อ role (ไม่ผูกกับเลข role_id) เพื่อไม่ให้พังถ้า role_id ในแต่ละเครื่องไม่ตรงกัน
+    public const ROLE_EXECUTIVE_NAME = 'Executive';
+
+    /** @var int|null|false เก็บ role_id ของ Executive ไว้ใช้ซ้ำในคำขอเดียว (false = ยังไม่ได้ค้น) */
+    protected static $executiveRoleIdCache = false;
+
+    /**
+     * เป็น Executive หรือไม่ — สิทธิ์เดียวที่เปิดดู PIN ได้
+     */
+    public function isExecutive(): bool
+    {
+        return strcasecmp((string) optional($this->role)->role_name, self::ROLE_EXECUTIVE_NAME) === 0;
+    }
+
+    /**
+     * role_id ของ Executive (ไม่พบคืน null)
+     */
+    public static function executiveRoleId(): ?int
+    {
+        if (static::$executiveRoleIdCache === false) {
+            $id = Role::whereRaw('LOWER(role_name) = ?', [strtolower(self::ROLE_EXECUTIVE_NAME)])->value('role_id');
+            static::$executiveRoleIdCache = $id !== null ? (int) $id : null;
+        }
+        return static::$executiveRoleIdCache;
+    }
+    // ===== [จบ สิทธิ์ตามบทบาท: Executive] =====
+
     protected $fillable = [
         'staff_name',
         'staff_email',

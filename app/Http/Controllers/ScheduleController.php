@@ -7,6 +7,8 @@ use App\Models\Schedule;
 use App\Models\Counter;
 use App\Models\Staff;
 use App\Models\Evaluation; // [แก้ไข ระดับ 2 ข้อ 10] ใช้นับคะแนนประเมินตอนแจ้งว่าลบ Slot ไม่ได้
+use App\Models\Checkin;    // [Check-in ฟีเจอร์ใหม่ ข้อ 3] บังคับ Check-out
+use App\Services\CheckinService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -29,7 +31,8 @@ class ScheduleController extends Controller
 
         $counters = Counter::with(['countersubs.schedules' => function ($query) use ($startOfWeek, $endOfWeek) {
             // [แก้ไข ระดับ 2 ข้อ 10] นับจำนวน Check-in ของแต่ละกะ เพื่อให้หน้าเว็บรู้ว่ากะไหนลบไม่ได้
-            $query->with('staff')
+            // [Check-in ฟีเจอร์ใหม่ ข้อ 3] โหลดประวัติ Check-in ของแต่ละกะ (พร้อมชื่อคน) เพื่อแสดงเวลานั่งจริงและไทม์ไลน์
+            $query->with(['staff', 'checkins' => fn ($q) => $q->with('staff')->orderBy('checkin_at')])
                   ->withCount('checkins')
                   ->whereBetween('schedule_date', [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')])
                   ->orderBy('start_time', 'asc')
@@ -203,6 +206,28 @@ class ScheduleController extends Controller
             return redirect()->back()->with('success', 'ลบข้อมูลตารางปฏิบัติงานเรียบร้อยแล้ว');
         });
     }
+
+    // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 3/4] หัวหน้าบังคับ Check-out =====
+    // ใช้เมื่อพนักงานลืม Check-out แล้วเครื่องเดิมใช้ไม่ได้ (เช่น ปิดเบราว์เซอร์ไปแล้ว) จนถูกบล็อกไม่ให้ Check-in จุดอื่น (ข้อ 4)
+    // หรือต่อเวลาแล้วลืม Check-out (ระบบไม่ Check-out ให้อัตโนมัติ)
+    // route จำกัดเฉพาะ manage-admin
+    public function forceCheckout($checkin_id)
+    {
+        $checkin = Checkin::with(['staff', 'schedule'])
+            ->where('checkin_id', $checkin_id)
+            ->whereNull('checkout_at')
+            ->first();
+
+        if (!$checkin) {
+            return redirect()->back()->withErrors(['รายการนี้ Check-out ไปแล้ว หรือไม่พบข้อมูล']);
+        }
+
+        CheckinService::closeCheckin($checkin, Checkin::REASON_FORCED);
+
+        $name = $checkin->staff->staff_name ?? 'บุคลากร';
+        return redirect()->back()->with('success', "บังคับ Check-out ให้ {$name} เรียบร้อยแล้ว");
+    }
+    // ===== [จบ forceCheckout] =====
 
     public function importExcel(Request $request)
     {

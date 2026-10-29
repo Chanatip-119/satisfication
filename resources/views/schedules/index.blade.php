@@ -13,12 +13,17 @@
 <body>
     @php
         $isEmployee = auth()->check() && auth()->user()->isEmployee();
+        // [Check-in ฟีเจอร์ใหม่ ข้อ 3] ชื่อบุคลากรตาม staff_id ใช้แสดง "รับช่วงต่อจากใคร" ในไทม์ไลน์
+        $staffNameMap = $staffs->pluck('staff_name', 'staff_id');
     @endphp
     
     <div class="sidebar">
         <div class="sidebar-logo"><img src="{{ asset('images/Buu-logo11.png') }}" alt="Logo"></div>
         <div class="menu-category">หลัก</div>
-        <a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>
+        {{-- [สิทธิ์ตามบทบาท] Employee ไม่เห็นเมนูแดชบอร์ด --}}
+        @unless($isEmployee)<a href="{{ url('/dashboard') }}" class="menu-item {{ request()->is('/dashboard') ? 'active' : '' }}">แดชบอร์ด</a>@endunless
+        {{-- [Check-in ฟีเจอร์ใหม่ ข้อ 1] เมนูการแจ้งเตือน (แสดงเฉพาะ Executive / Super_Admin / Admin) --}}
+        @include('partials.notification-bell')
         <a href="{{ route('schedule.index') }}" class="menu-item active">ตารางปฏิบัติงาน</a>
         <a href="{{ route('report.counter') }}" class="menu-item">รายงานเคาน์เตอร์</a>
         <a href="{{ route('report.staff') }}" class="menu-item">รายงาน Staff</a>
@@ -92,7 +97,6 @@
             </div>
             <div class="action-buttons">
                 @unless($isEmployee)
-                <button class="btn btn-outline"><i class="far fa-clock"></i> ตั้งเวลาเคาน์เตอร์</button>
                 <button class="btn btn-outline" onclick="openModal('importModal')"></i> Import Excel</button>
                 <button class="btn btn-yellow" onclick="openModal('addModal')">+ เพิ่มตาราง</button>
                 @endunless
@@ -154,12 +158,63 @@
                                                     $cardClass = 'close-card';
                                                     $timeClass = 'close-text';
                                                 }
+
+                                                // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 3] ข้อมูลการนั่งจริงจากตาราง checkin =====
+                                                $ckList = $sch->checkins ?? collect();
+                                                $activeCk = $ckList->first(fn ($c) => is_null($c->checkout_at));
+                                                $firstCk = $ckList->first();
+                                                $lastOutCk = $ckList->whereNotNull('checkout_at')->sortBy('checkout_at')->last();
+                                                $peopleCount = $ckList->pluck('staff_id')->unique()->count();
+
+                                                // มีคนนั่งอยู่จริง → การ์ดสีเขียว (รวมกรณีต่อเวลาเลยเวลากะไปแล้ว)
+                                                if ($activeCk) {
+                                                    $cardClass = 'checkin-card';
+                                                    $timeClass = '';
+                                                }
+
+                                                // ข้อมูลไทม์ไลน์สำหรับแท็บ "ประวัติ" (ส่งผ่าน data-history)
+                                                $historyData = $ckList->values()->map(function ($c, $i) use ($ckList, $staffNameMap) {
+                                                    $reason = $c->checkout_reason;
+                                                    if (!$reason && $c->checkout_at) {
+                                                        // ข้อมูลเก่าก่อนมีคอลัมน์ checkout_reason: เดาจาก is_kicked และการ Check-in ถัดไป
+                                                        $takenOver = $ckList->values()->slice($i + 1)
+                                                            ->contains(fn ($n) => (int) $n->substituting_for_id === (int) $c->staff_id);
+                                                        $reason = $c->is_kicked ? ($takenOver ? 'takeover' : 'auto') : 'manual';
+                                                    }
+                                                    return [
+                                                        'id'             => $c->checkin_id,
+                                                        'name'           => $c->staff->staff_name ?? 'ไม่ระบุ',
+                                                        'in'             => $c->checkin_at ? \Carbon\Carbon::parse($c->checkin_at)->format('H:i') : null,
+                                                        'out'            => $c->checkout_at ? \Carbon\Carbon::parse($c->checkout_at)->format('H:i') : null,
+                                                        'reason'         => $reason,
+                                                        'sub_for'        => $c->substituting_for_id ? ($staffNameMap[$c->substituting_for_id] ?? null) : null,
+                                                        'extended_until' => $c->extended_until ? \Carbon\Carbon::parse($c->extended_until)->format('H:i') : null,
+                                                        'extended_at'    => $c->extended_at ? \Carbon\Carbon::parse($c->extended_at)->format('H:i') : null,
+                                                    ];
+                                                });
+                                                // ===== [จบ ข้อ 3: ข้อมูลการนั่งจริง] =====
                                     ?>
                                                 @if(!empty($sch->staff_id) && $sch->staff_id > 0 && !empty($sch->staff) && !empty($sch->staff->staff_name))
-                                                <div class="schedule-card {{ $cardClass }}"
-                                                @unless($isEmployee)onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}", {{ (int) ($sch->checkins_count ?? 0) }})'@endunless>
+                                                <div class="schedule-card {{ $cardClass }}" data-history="{{ json_encode($historyData, JSON_UNESCAPED_UNICODE) }}"
+                                                @unless($isEmployee)onclick='openComplexEditModal({{ $sch->schedule_id }}, "{{ $counter->counter_id }}", "{{ $sub->counter_sub_id }}", "{{ $day->translatedFormat("l") }}", "{{ $sch->start_time }}", "{{ $sch->end_time }}", "{{ $sch->schedule_date }}", "{{ $sch->staff->staff_name ?? "ไม่ระบุ" }}", {{ $sch->staff_id ?? 0 }}, "{{ $sch->status }}", "{{ $sch->created_at ? \Carbon\Carbon::parse($sch->created_at)->format('d/m/Y H:i') : '' }}", "{{ $sch->updated_at ? \Carbon\Carbon::parse($sch->updated_at)->format('d/m/Y H:i') : '' }}", {{ (int) ($sch->checkins_count ?? 0) }}, this)'@endunless>
                                                     <div class="sch-time {{ $timeClass }}">{{ substr($sch->start_time,0,5) }} - {{ substr($sch->end_time,0,5) }}</div>
                                                     <div class="sch-name">{{ $sch->staff->staff_name ?? 'ไม่ระบุชื่อ' }}</div>
+                                                    {{-- [Check-in ฟีเจอร์ใหม่ ข้อ 3] เวลานั่งจริง: ใครนั่งอยู่ตั้งแต่กี่โมง / ช่วงที่นั่งจริงหลังจบกะ --}}
+                                                    @if($activeCk)
+                                                        <div class="sch-live">
+                                                            ● นั่งอยู่ตั้งแต่ {{ \Carbon\Carbon::parse($activeCk->checkin_at)->format('H:i') }}
+                                                            @if((int) $activeCk->staff_id !== (int) $sch->staff_id)
+                                                                ({{ $activeCk->staff->staff_name ?? 'ไม่ระบุ' }})
+                                                            @endif
+                                                            @if($activeCk->extended_until)
+                                                                <span class="sch-extended">ต่อเวลาถึง {{ \Carbon\Carbon::parse($activeCk->extended_until)->format('H:i') }}</span>
+                                                            @endif
+                                                        </div>
+                                                    @elseif($firstCk)
+                                                        <div class="sch-actual">
+                                                            นั่งจริง {{ \Carbon\Carbon::parse($firstCk->checkin_at)->format('H:i') }}–{{ $lastOutCk ? \Carbon\Carbon::parse($lastOutCk->checkout_at)->format('H:i') : '-' }}@if($peopleCount > 1) ({{ $peopleCount }} คน)@endif
+                                                        </div>
+                                                    @endif
                                                 </div>
                                                 @endif
                                     <?php 
@@ -814,7 +869,8 @@
         }
 
         // [แก้ไข ระดับ 2 ข้อ 10] เพิ่มพารามิเตอร์ checkinCount (จำนวนครั้งที่มีคน Check-in ในกะนี้)
-        function openComplexEditModal(schId, counterId, counterSubId, dayName, start, end, date, staffName, staffId, status, createdAt, updatedAt, checkinCount = 0) {
+        function openComplexEditModal(schId, counterId, counterSubId, dayName, start, end, date, staffName, staffId, status, createdAt, updatedAt, checkinCount = 0, cardEl = null) {
+            // [Check-in ฟีเจอร์ใหม่ ข้อ 3] เพิ่มพารามิเตอร์ cardEl (การ์ดที่ถูกคลิก) เพื่ออ่านประวัติ Check-in จาก data-history
             let startShort = start.substring(0, 5);
             let endShort = end.substring(0, 5);
             let normStatus = (status || 'empty').toLowerCase();
@@ -878,26 +934,9 @@
             }
             // ===== [จบ ข้อ 10] =====
 
-            let historyHtml = '<div class="history-list">';
-            let hasHistory = false;
-            
-            if(createdAt) {
-                historyHtml += `<div class="h-item"><div class="h-dot create"></div><div><div class="h-time">${createdAt}</div><div class="h-text">สร้างตารางปฏิบัติงาน (คนหลัก)</div></div></div>`;
-                hasHistory = true;
-            }
-
-            if(updatedAt && updatedAt !== createdAt) {
-                historyHtml += `<div class="h-item"><div class="h-dot update"></div><div><div class="h-time">${updatedAt}</div><div class="h-text">อัปเดตข้อมูล / แก้ไขล่าสุด</div></div></div>`;
-                hasHistory = true;
-            }
-
-            historyHtml += '</div>';
-
-            if(!hasHistory) {
-                historyHtml = '<div style="color: #718096; font-size: 14px; text-align: center; margin-top: 30px;">ไม่มีข้อมูลประวัติในระบบ</div>';
-            }
-
-            document.getElementById('historyTimelineContainer').innerHTML = historyHtml;
+            // [Check-in ฟีเจอร์ใหม่ ข้อ 3] แท็บประวัติแสดงไทม์ไลน์การนั่งจริงจากตาราง checkin
+            // เดิม: แสดงเวลาสร้าง/แก้ไขกะ ซึ่งว่างเสมอ (ตาราง schedule ไม่มี created_at / updated_at)
+            renderCheckinHistory(cardEl);
 
             switchEditTab(1); 
             openModal('complexEditModal');
@@ -996,6 +1035,91 @@
                 }, false);
             }
         });
+
+        // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 3] ไทม์ไลน์ประวัติ Check-in =====
+        const scheduleCsrfToken = "{{ csrf_token() }}";
+        const forceCheckoutBase = "{{ url('/schedule/checkin') }}/";
+        const CHECKOUT_REASON_LABEL = {
+            manual: 'Check-out เอง',
+            auto: 'Check-out อัตโนมัติ (หมดเวลากะ)',
+            takeover: 'ถูกรับช่วงต่อ',
+            forced: 'หัวหน้าบังคับ Check-out'
+        };
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        }
+
+        function renderCheckinHistory(cardEl) {
+            const box = document.getElementById('historyTimelineContainer');
+            let list = [];
+            try { list = JSON.parse((cardEl && cardEl.dataset.history) || '[]'); } catch (e) { list = []; }
+
+            if (!list.length) {
+                box.innerHTML = '<div style="color: #718096; font-size: 14px; text-align: center; margin-top: 30px;">ยังไม่มีการ Check-in ในกะนี้</div>';
+                return;
+            }
+
+            // แตกเป็นเหตุการณ์ตามเวลา: Check-in / ต่อเวลา / Check-out / กำลังนั่งอยู่
+            const events = [];
+            list.forEach(c => {
+                events.push({
+                    time: c.in, dot: 'checkin',
+                    text: `${escapeHtml(c.name)} Check-in` + (c.sub_for ? ` — รับช่วงต่อจาก ${escapeHtml(c.sub_for)}` : '')
+                });
+                if (c.extended_at) {
+                    events.push({ time: c.extended_at, dot: 'extend', text: `${escapeHtml(c.name)} ต่อเวลาถึง ${escapeHtml(c.extended_until)} น. (ต้อง Check-out เอง)` });
+                }
+                if (c.out) {
+                    events.push({
+                        time: c.out, dot: c.reason === 'takeover' ? 'takeover' : 'checkout',
+                        text: `${escapeHtml(c.name)} ${CHECKOUT_REASON_LABEL[c.reason] || 'Check-out'}`
+                    });
+                } else {
+                    events.push({ time: 'ตอนนี้', sortKey: '99:99', dot: 'live', text: `${escapeHtml(c.name)} กำลังนั่งอยู่`, checkinId: c.id });
+                }
+            });
+            events.sort((a, b) => (a.sortKey || a.time || '').localeCompare(b.sortKey || b.time || ''));
+
+            let html = '<div class="history-list">';
+            events.forEach(ev => {
+                let action = '';
+                if (ev.checkinId) {
+                    action = `
+                        <form method="POST" action="${forceCheckoutBase}${encodeURIComponent(ev.checkinId)}/force-checkout" style="margin-top: 6px;"
+                              onsubmit="return confirm('ยืนยันบังคับ Check-out คนนี้? (ใช้เมื่อพนักงานไม่ได้อยู่ที่เคาน์เตอร์แล้ว แต่ลืม Check-out)');">
+                            <input type="hidden" name="_token" value="${scheduleCsrfToken}">
+                            <button type="submit" class="btn-force-checkout">บังคับ Check-out</button>
+                        </form>`;
+                }
+                html += `<div class="h-item"><div class="h-dot ${ev.dot}"></div><div><div class="h-time">${escapeHtml(ev.time)}${ev.time && ev.time !== 'ตอนนี้' ? ' น.' : ''}</div><div class="h-text">${ev.text}</div>${action}</div></div>`;
+            });
+            html += '</div>';
+            box.innerHTML = html;
+        }
+        // ===== [จบ ข้อ 3: ไทม์ไลน์] =====
+
+        // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 3] อัปเดตตารางอัตโนมัติทุก 20 วินาที (Real-time) =====
+        // ดึงหน้าเดิมแล้วแทนที่เฉพาะส่วนตาราง — ข้ามถ้ามี Modal เปิดอยู่ หรือแท็บถูกซ่อน
+        (function () {
+            setInterval(function () {
+                if (document.hidden) return;
+                const modalOpen = Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display === 'flex');
+                if (modalOpen) return;
+
+                fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' })
+                    .then(res => res.ok ? res.text() : null)
+                    .then(html => {
+                        if (!html) return;
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const fresh = doc.querySelector('.table-card');
+                        const current = document.querySelector('.table-card');
+                        if (fresh && current) current.innerHTML = fresh.innerHTML;
+                    })
+                    .catch(() => {});
+            }, 20000);
+        })();
+        // ===== [จบ ข้อ 3: อัปเดตอัตโนมัติ] =====
 
         function toggleProfileDropdown() {
             const dropdown = document.getElementById('profileDropdown');
