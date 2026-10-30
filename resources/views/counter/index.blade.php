@@ -113,7 +113,13 @@
                     @foreach($counters as $counter)
                     <tr>
                         <td>
-                            <div class="counter-title">{{ $counter->counter_id }}</div>
+                            <div class="counter-title">
+                                {{ $counter->counter_id }}
+                                {{-- [รายงาน+Online ข้อ 4] ป้ายบอกประเภท --}}
+                                @if($counter->is_online)
+                                    <span style="margin-left: 6px; padding: 2px 8px; border-radius: 10px; background: #ebf8ff; color: #2b6cb0; font-size: 11px; font-weight: 700;">Online</span>
+                                @endif
+                            </div>
                             <div class="counter-desc">{{ $counter->counter_location }}</div>
                         </td>
                         <td>
@@ -191,6 +197,22 @@
                         </div>
                     </div>
 
+                    {{-- ===== [รายงาน+Online ข้อ 4] ประเภทเคาน์เตอร์ ===== --}}
+                    <div class="form-group">
+                        <label class="form-label">ประเภทเคาน์เตอร์:</label>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #cbd5e0; border-radius: 8px; cursor: pointer;">
+                                <input type="radio" name="is_online" value="0" id="inp_type_normal" checked style="margin-top: 4px;">
+                                <span><strong>เคาน์เตอร์ปกติ</strong><br><span style="font-size: 12px; color: #718096;">มีบุคลากรประจำ ต้อง Check-in ก่อนรับการประเมิน</span></span>
+                            </label>
+                            <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #cbd5e0; border-radius: 8px; cursor: pointer;">
+                                <input type="radio" name="is_online" value="1" id="inp_type_online" style="margin-top: 4px;">
+                                <span><strong>เคาน์เตอร์ Online</strong><br><span style="font-size: 12px; color: #718096;">รับประเมินตลอด 24 ชม. ไม่ต้องมีคน Check-in · คะแนนเป็นของเคาน์เตอร์ ไม่นับให้บุคลากร · ไม่แสดงในหน้าตารางปฏิบัติงานและหน้า Check-in</span></span>
+                            </label>
+                        </div>
+                    </div>
+                    {{-- ===== [จบ ข้อ 4: ประเภทเคาน์เตอร์] ===== --}}
+
                     <div class="modal-footer" style="margin-top: 30px;">
                         <button type="button" class="btn btn-outline" onclick="closeModal('modal-counter')">ยกเลิก</button>
                         <button type="submit" class="btn btn-yellow">บันทึกข้อมูล</button>
@@ -267,6 +289,8 @@
                 
                 // [แก้ไข ระดับ 2 ข้อ 8] เดิม: document.querySelector(...).click();
                 setCounterStatusRadio(data.is_active ? '1' : '0');
+                // [รายงาน+Online ข้อ 4] ตั้งประเภทเคาน์เตอร์ตามข้อมูลเดิม
+                document.getElementById(data.is_online ? 'inp_type_online' : 'inp_type_normal').checked = true;
                 
                 document.getElementById('form-unified').action = `/counter/${data.counter_id}`;
                 document.getElementById('form-method').value = 'PUT';
@@ -336,6 +360,7 @@
                 document.getElementById('sub-counter-list-container').innerHTML = ''; 
                 // [แก้ไข ระดับ 2 ข้อ 8] เดิม: document.querySelector('input[name="is_active"][value="1"]').click();
                 setCounterStatusRadio('1');
+                document.getElementById('inp_type_normal').checked = true; // [รายงาน+Online ข้อ 4] ค่าเริ่มต้น: เคาน์เตอร์ปกติ
                 document.getElementById('delete-section').style.display = 'none';
                 
                 document.getElementById('tab-subcounter-nav').style.display = 'block';

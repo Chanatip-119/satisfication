@@ -29,10 +29,18 @@ class ReportController extends Controller
                     $q->where('counter_sub_id', $sub->counter_sub_id);
                 })->pluck('checkin_id');
 
-                $subEvaluations = Evaluation::whereIn('checkin_id', $checkinIds);
-                
-                $avg = $subEvaluations->count() > 0 ? number_format($subEvaluations->avg('rating'), 1) : '0.0';
-                $count = $subEvaluations->count();
+                // [รายงาน+Online ข้อ 4] นับจาก counter_sub_id ด้วย (การประเมิน Online ไม่มี checkin_id)
+                // เดิม: Evaluation::whereIn('checkin_id', $checkinIds) — ไม่เห็นคะแนนของเคาน์เตอร์ Online เลย
+                // ใช้ query เดียว (นับ + เฉลี่ย) และ CAST rating เป็นตัวเลขเพราะใน DB เป็น ENUM ข้อความ
+                $stats = Evaluation::where(function ($q) use ($sub, $checkinIds) {
+                        $q->where('counter_sub_id', $sub->counter_sub_id)
+                          ->orWhereIn('checkin_id', $checkinIds); // ข้อมูลเก่าที่ยังไม่มี counter_sub_id
+                    })
+                    ->selectRaw('COUNT(*) AS total, AVG(CAST(rating AS UNSIGNED)) AS average')
+                    ->first();
+
+                $count = (int) ($stats->total ?? 0);
+                $avg = $count > 0 ? number_format((float) $stats->average, 1) : '0.0';
 
                 $activeCheckin = Checkin::whereHas('schedule', function($q) use ($sub) {
                     $q->where('counter_sub_id', $sub->counter_sub_id);
@@ -44,6 +52,12 @@ class ReportController extends Controller
                 if ($activeCheckin && $activeCheckin->staff) {
                     $currentStaffName = $activeCheckin->staff->staff_name;
                     $status = 'Active';
+                }
+
+                // [รายงาน+Online ข้อ 4] เคาน์เตอร์ Online: ไม่มีคนประจำ เปิดรับประเมินตลอด
+                if ($counter->is_online) {
+                    $currentStaffName = 'ประเมิน Online (ไม่มีผู้ประจำ)';
+                    $status = ($sub->is_active && $counter->is_active) ? 'Online' : 'Close';
                 }
 
                 // [แก้ไข ระดับ 4] ลบการหาเวลา ($schedule / $timeRange) ออก

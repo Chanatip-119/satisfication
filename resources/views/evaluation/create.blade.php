@@ -106,11 +106,12 @@
                                 (โปรดเขียนข้อเสนอแนะของคุณเพื่อให้เรานำไปปรับแก้ไขให้ดียิ่งขึ้น)
                             </span>
                         </label>
-                        {{-- [แก้ไข ระดับ 2 ข้อ 11] จำกัด 255 ตัวอักษรตามคอลัมน์ใน DB + แสดงตัวนับ
+                        {{-- [รายงาน+Online] ปรับเป็น 2500 ตัวอักษรตามคอลัมน์จริงใน DB (varchar(2500))
+                             [แก้ไข ระดับ 2 ข้อ 11] เคยจำกัด 255 ตัวอักษร + แสดงตัวนับ
                              และคืนข้อความเดิม (old) ถ้าส่งไม่ผ่าน ผู้ใช้จะได้ไม่ต้องพิมพ์ใหม่
                              เดิม: <textarea id="feedback" name="comment"></textarea> --}}
-                        <textarea id="feedback" name="comment" maxlength="255" oninput="updateCommentCount(this)">{{ old('comment') }}</textarea>
-                        <div id="comment-count" style="text-align: right; font-size: 12px; color: #a0aec0; margin-top: 6px;">0/255</div>
+                        <textarea id="feedback" name="comment" maxlength="2500" oninput="updateCommentCount(this)">{{ old('comment') }}</textarea>
+                        <div id="comment-count" style="text-align: right; font-size: 12px; color: #a0aec0; margin-top: 6px;">0/2500</div>
                     </div>
 
                     {{-- [แก้ไข ระดับ 3 ข้อ 14] เพิ่ม id เพื่อปิดปุ่มหลังกดส่ง กันกดซ้ำ --}}
@@ -159,8 +160,8 @@
             let counter = document.getElementById('comment-count');
             if (!counter) return;
             let length = textarea.value.length;
-            counter.innerText = length + '/255';
-            counter.style.color = length >= 230 ? '#d97706' : '#a0aec0';
+            counter.innerText = length + '/2500';
+            counter.style.color = length >= 2400 ? '#d97706' : '#a0aec0';
         }
 
         function selectRating(selectedBox) {

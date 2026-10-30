@@ -256,6 +256,8 @@
 .status-pill.active    { background: #dcfce7; color: #15803d; }
 .status-pill.available { background: #fef3c7; color: #b45309; }
 .status-pill.close     { background: #e2e8f0; color: #475569; }
+/* [รายงาน+Online ข้อ 4] เคาน์เตอร์ Online */
+.status-pill.online    { background: #ebf8ff; color: #2b6cb0; }
 
 .status-dot {
     width: 6px;
@@ -492,6 +494,10 @@
     font-weight: 400;
     margin-left: 6px;
 }
+
+/* [รายงาน+Online ข้อ 1] คำชี้แจงจากผู้ให้บริการใต้ความคิดเห็น */
+.comment-note { margin-top: 6px; padding: 6px 10px; background: #ebf8ff; border-left: 3px solid #3182ce; border-radius: 6px; font-size: 12px; color: #2d3748; white-space: pre-wrap; word-break: break-word; }
+.comment-note-label { font-weight: 700; color: #2b6cb0; }
 
 .comment-text {
     font-size: 13px;

@@ -101,7 +101,8 @@ class DashboardController extends Controller
             $rawArray = method_exists($ev, 'toArray') ? $ev->toArray() : json_decode(json_encode($ev), true);
             $evalDateRaw = null;
             
-            foreach (['created_at', 'updated_at', 'timestamp', 'evaluation_time', 'eval_time', 'evaluation_date', 'date', 'time'] as $col) {
+            // [รายงาน+Online ข้อ 1] ใช้ evaluation_at ก่อน (กันไปหยิบ staff_note_at ซึ่งเป็นเวลาเขียนคำชี้แจง)
+            foreach (['evaluation_at', 'created_at', 'updated_at', 'timestamp', 'evaluation_time', 'eval_time', 'evaluation_date', 'date', 'time'] as $col) {
                 if (!empty($rawArray[$col])) {
                     $evalDateRaw = $rawArray[$col];
                     break;
@@ -110,7 +111,7 @@ class DashboardController extends Controller
             
             if (!$evalDateRaw) {
                 foreach ($rawArray as $key => $val) {
-                    if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/', $val) && !in_array($key, ['checkin_at', 'checkout_at'])) {
+                    if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/', $val) && !in_array($key, ['checkin_at', 'checkout_at', 'staff_note_at'])) {
                         $evalDateRaw = $val;
                         break;
                     }
@@ -132,7 +133,8 @@ class DashboardController extends Controller
                 'date_str'       => $resolvedDate->format('Y-m-d'),
                 'counter_sub_id' => $resolvedSubId,
                 'counter_id'     => $resolvedCounterId,
-                'staff_id'       => $resolvedStaffId
+                'staff_id'       => $resolvedStaffId,
+                'note'           => trim((string) $ev->staff_note), // [รายงาน+Online ข้อ 1]
             ]);
         }
 
@@ -281,6 +283,13 @@ class DashboardController extends Controller
                     }
                 }
 
+                // [รายงาน+Online ข้อ 4] เคาน์เตอร์ Online: ไม่มีคนประจำ เปิดรับประเมินตลอด
+                if ($counter->is_online) {
+                    $statusBadge = 'Online';
+                    $staffName   = 'ประเมิน Online (ไม่มีผู้ประจำ)';
+                    $timeRange   = 'ตลอด 24 ชม.';
+                }
+
                 if ($statusBadge === 'Active' && $staffName) {
                     $activeCheckinStaffs[] = [
                         'staff_id'     => $currentStaffId,
@@ -369,7 +378,8 @@ class DashboardController extends Controller
                 'score'        => round($ev->score, 1),
                 'counter_code' => $subInfo ? 'เคาน์เตอร์ ' . $subInfo['code'] : ($ev->counter_id ? 'เคาน์เตอร์ ' . $ev->counter_id : 'ทั่วไป'),
                 'staff_name'   => $staffName,
-                'time'         => $timeStr
+                'time'         => $timeStr,
+                'note'         => $ev->note, // [รายงาน+Online ข้อ 1] คำชี้แจงจากผู้ให้บริการ
             ];
         });
 

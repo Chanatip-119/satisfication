@@ -14,6 +14,12 @@ class Counter extends Model
         'counter_id',
         'counter_location',
         'is_active',
+        'is_online', // [รายงาน+Online ข้อ 4] เคาน์เตอร์ประเมิน Online (ไม่ต้องมีคน Check-in)
+    ];
+
+    // [รายงาน+Online ข้อ 4] ให้ is_online เป็น true/false เสมอ (ใน DB เป็น 0/1)
+    protected $casts = [
+        'is_online' => 'boolean',
     ];
 
     public function countersubs()

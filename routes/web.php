@@ -66,6 +66,8 @@ Route::post('/checkin/step3', [CheckinController::class, 'step3'])->name('checki
 Route::post('/checkin/checkout', [CheckinController::class, 'checkout'])->name('checkin.checkout');
 // [Check-in ฟีเจอร์ใหม่ ข้อ 2] ต่อเวลา (กดได้เฉพาะเครื่องที่ใช้ Check-in ตรวจใน CheckinController::extend)
 Route::post('/checkin/extend', [CheckinController::class, 'extend'])->name('checkin.extend');
+// [รายงาน+Online ข้อ 1] เขียนคำชี้แจงต่อการประเมิน (เขียนได้เฉพาะการประเมินของคนที่ Check-in อยู่ที่เครื่องนี้ ครั้งเดียว)
+Route::post('/checkin/evaluation-note', [CheckinController::class, 'saveEvaluationNote'])->name('checkin.evaluationNote');
 
 // =========================================================================
 // 3. เส้นทางที่ต้องผ่านการเข้าสู่ระบบเท่านั้น (Protected Routes)

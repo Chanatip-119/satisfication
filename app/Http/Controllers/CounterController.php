@@ -35,7 +35,10 @@ class CounterController extends Controller
             'counter_id' => 'required|string|unique:counter,counter_id',
             'counter_location' => 'required|string|max:255',
             'is_active' => 'required|boolean',
+            // [รายงาน+Online ข้อ 4] ประเภทเคาน์เตอร์: 0 = ปกติ (มีคน Check-in), 1 = Online (รับประเมินตลอด)
+            'is_online' => 'nullable|boolean',
         ]);
+        $validated['is_online'] = (bool) ($validated['is_online'] ?? false);
 
         DB::transaction(function () use ($validated, $request) {
             $counter = Counter::create($validated);
@@ -63,9 +66,32 @@ class CounterController extends Controller
         $validated = $request->validate([
             'counter_location' => 'required|string|max:255',
             'is_active' => 'required|boolean',
+            // [รายงาน+Online ข้อ 4] ประเภทเคาน์เตอร์
+            'is_online' => 'nullable|boolean',
         ]);
+        $validated['is_online'] = (bool) ($validated['is_online'] ?? false);
 
         $counter = Counter::findOrFail($id);
+
+        // ===== [รายงาน+Online ข้อ 4] เปลี่ยนเคาน์เตอร์ปกติเป็น Online ได้เมื่อไม่มีคนนั่งและไม่มีกะค้างอยู่ =====
+        // ไม่งั้นกะของบุคลากรที่จัดไว้จะหายจากหน้าตาราง และคนที่กำลัง Check-in อยู่จะค้าง
+        if ($validated['is_online'] && !$counter->is_online) {
+            $subIds = $counter->countersubs()->pluck('counter_sub_id');
+            $hasActiveCheckin = Checkin::whereNull('checkout_at')
+                ->whereHas('schedule', fn ($q) => $q->whereIn('counter_sub_id', $subIds))
+                ->exists();
+            $upcomingCount = Schedule::whereIn('counter_sub_id', $subIds)
+                ->where('schedule_date', '>=', \App\Services\CheckinService::now()->toDateString())
+                ->count();
+
+            if ($hasActiveCheckin || $upcomingCount > 0) {
+                $reason = $hasActiveCheckin ? 'มีบุคลากรกำลัง Check-in อยู่' : "มีกะของบุคลากรตั้งแต่วันนี้เป็นต้นไป {$upcomingCount} กะ";
+                return redirect()->route('counter.index')->withErrors([
+                    "เปลี่ยนเป็นเคาน์เตอร์ Online ไม่ได้ เพราะ{$reason} — กรุณาย้ายหรือลบกะเหล่านั้นก่อน",
+                ]);
+            }
+        }
+        // ===== [จบ ข้อ 4: ตรวจก่อนเปลี่ยนเป็น Online] =====
 
         DB::transaction(function () use ($counter, $validated, $request) {
             $counter->update($validated);

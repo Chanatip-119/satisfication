@@ -2,184 +2,174 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Evaluation;
 use App\Models\Counter;
-use App\Models\CounterSub; // [แก้ไข ระดับ 4] ใช้ชื่อเคาน์เตอร์รูปแบบกลาง
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use App\Services\CheckinService;
+use App\Services\EvaluationExcelExporter;
+use App\Services\EvaluationReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
+/**
+ * [รายงาน+Online ข้อ 2/3] ส่งออกรายงาน — เขียนใหม่ทั้งไฟล์
+ *
+ * เดิม: PDF/CSV มีแค่รายการประเมินทีละแถว
+ * ใหม่: ข้อมูลทั้งหมดมาจาก EvaluationReportService (คำนวณครั้งเดียว ตัวเลขใน PDF/Excel ตรงกัน)
+ *   - PDF  : รายละเอียดเคาน์เตอร์, สรุปรายบุคลากร × เคาน์เตอร์, สรุปรายวัน × เคาน์เตอร์,
+ *            รอบ Check-in (เวลาเริ่ม–สิ้นสุด), รายการประเมิน + คำชี้แจง
+ *   - Excel: ไฟล์ .xlsx เลือกรูปแบบได้ (รายเคาน์เตอร์ / ภาพรวม / ค่าเฉลี่ย) แต่ละแบบเป็นชีตแยก
+ *
+ * คงไว้จากระดับก่อน: [สิทธิ์ตามบทบาท] Employee เข้าไม่ได้, [ระดับ 3 ข้อ 15] ช่วงเวลาต้องเป็นค่าที่กำหนด,
+ *                   กัน Excel/CSV Injection (ตอนนี้อยู่ใน EvaluationExcelExporter)
+ */
 class ExportReportController extends Controller
 {
+    /** ช่วงเวลาที่กำหนดเองยาวได้สูงสุด (กันการสร้างรายงานใหญ่เกินจนเซิร์ฟเวอร์ค้าง) */
+    private const MAX_CUSTOM_DAYS = 366;
+
     public function index()
     {
-        // [สิทธิ์ตามบทบาท] Employee ส่งออกรายงานไม่ได้ (route กันด้วย can:manage-admin อยู่แล้ว ตรวจซ้ำอีกชั้นเผื่อ Gate ถูกแก้)
+        // [สิทธิ์ตามบทบาท] Employee ส่งออกรายงานไม่ได้ (route กันด้วย can:manage-admin อยู่แล้ว ตรวจซ้ำอีกชั้น)
         abort_if(auth()->user()?->isEmployee(), 403);
 
-        $counters = Counter::where('is_active', true)->get();
-        return view('report.export', compact('counters'));
+        // [รายงาน+Online] แสดงทุกเคาน์เตอร์ (รวมที่ปิดใช้งาน เผื่อดูข้อมูลย้อนหลัง) เรียงตามเลข
+        // เดิม: เฉพาะเคาน์เตอร์ที่เปิดใช้งาน — ปิดเคาน์เตอร์แล้วจะส่งออกข้อมูลย้อนหลังของเคาน์เตอร์นั้นไม่ได้
+        $counters = Counter::orderBy('counter_id')->get();
+
+        return view('report.export', [
+            'counters'       => $counters,
+            'excelAvailable' => EvaluationExcelExporter::isAvailable(),
+        ]);
     }
 
     public function export(Request $request)
     {
-        // [สิทธิ์ตามบทบาท] ตรวจซ้ำอีกชั้นเหมือน index()
         abort_if(auth()->user()?->isEmployee(), 403);
 
-        $request->validate([
-            'export_type' => 'required|in:pdf,excel',
-            // [แก้ไข ระดับ 3 ข้อ 15] รับเฉพาะช่วงเวลาที่มีในหน้าเว็บ
-            // เดิม: 'required' — ส่งค่าอื่นมาจะไม่เข้า case ใดเลย แล้วระบบส่งออกข้อมูล "ทั้งหมด" โดยไม่ตั้งใจ
-            'time_range' => 'required|in:today,week,month,custom',
+        $validated = $request->validate([
+            'export_type'   => 'required|in:pdf,excel',
+            // [ระดับ 3 ข้อ 15] รับเฉพาะช่วงเวลาที่มีในหน้าเว็บ
+            'time_range'    => 'required|in:today,week,month,custom',
+            'start_date'    => 'required_if:time_range,custom|nullable|date',
+            'end_date'      => 'required_if:time_range,custom|nullable|date|after_or_equal:start_date',
+            'select_all'    => 'nullable',
+            'counters'      => 'nullable|array',
+            'counters.*'    => ['integer', Rule::exists('counter', 'counter_id')],
+            // [รายงาน+Online ข้อ 3] รูปแบบ Excel (เลือกได้หลายแบบ)
+            'excel_modes'   => 'required_if:export_type,excel|nullable|array',
+            'excel_modes.*' => [Rule::in(EvaluationExcelExporter::MODES)],
+        ], [
+            'start_date.required_if' => 'กรุณาเลือกวันที่เริ่มต้น',
+            'end_date.required_if'   => 'กรุณาเลือกวันที่สิ้นสุด',
+            'end_date.after_or_equal'=> 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น',
+            'excel_modes.required_if'=> 'กรุณาเลือกรูปแบบรายงาน Excel อย่างน้อย 1 แบบ',
+            'counters.*.exists'      => 'มีเคาน์เตอร์ที่เลือกไม่อยู่ในระบบแล้ว กรุณารีเฟรชหน้า',
         ]);
 
-        return DB::transaction(function () use ($request) {
-            $startDate = null;
-            $endDate = null;
-
-            switch ($request->time_range) {
-                case 'today':
-                    $startDate = Carbon::today()->startOfDay();
-                    $endDate = Carbon::today()->endOfDay();
-                    break;
-                case 'week':
-                    $startDate = Carbon::now()->startOfWeek();
-                    $endDate = Carbon::now()->endOfWeek();
-                    break;
-                case 'month':
-                    $startDate = Carbon::now()->startOfMonth();
-                    $endDate = Carbon::now()->endOfMonth();
-                    break;
-                case 'custom':
-                    $request->validate([
-                        'start_date' => 'required|date',
-                        'end_date' => 'required|date|after_or_equal:start_date',
-                    ]);
-                    $startDate = Carbon::parse($request->start_date)->startOfDay();
-                    $endDate = Carbon::parse($request->end_date)->endOfDay();
-                    break;
-            }
-
-            $selectedCounters = [];
-            if (!$request->has('select_all') && $request->has('counters')) {
-                $selectedCounters = $request->counters;
-            }
-
-            // [แก้ไข ระดับ 3 ข้อ 15] โหลด counter มาด้วย เพื่อแสดงชื่อเคาน์เตอร์ที่อ่านเข้าใจได้
-            // เดิม: Evaluation::with(['checkin.staff', 'checkin.schedule.counterSub']);
-            $query = Evaluation::with(['checkin.staff', 'checkin.schedule.counterSub.counter']);
-
-            if ($startDate && $endDate) {
-                $query->whereBetween('evaluation_at', [$startDate, $endDate]);
-            }
-
-            if (!empty($selectedCounters)) {
-                $query->whereHas('checkin.schedule.counterSub', function ($q) use ($selectedCounters) {
-                    $q->whereIn('counter_id', $selectedCounters);
-                });
-            }
-
-            $evaluations = $query->orderBy('evaluation_at', 'desc')->get();
-
-            // ===== [แก้ไข ระดับ 3 ข้อ 15] เตรียมข้อมูลแต่ละแถวไว้ที่เดียว ใช้ร่วมกันทั้ง PDF และ CSV =====
-            // เดิม: PDF แสดงคอลัมน์เคาน์เตอร์เป็นแค่เลข counter_sub_id (เช่น "7") และ CSV เป็น "เคาน์เตอร์ 7"
-            //       ซึ่งไม่ตรงกับชื่อที่ใช้ในหน้าอื่น คนอ่านรายงานจะไม่รู้ว่าคือจุดไหน
-            $rows = $evaluations->map(function ($eval) {
-                $evaluatedAt = Carbon::parse($eval->evaluation_at);
-                return [
-                    'date'    => $evaluatedAt->format('d/m/Y'),
-                    'time'    => $evaluatedAt->format('H:i'),
-                    'counter' => $this->counterLabel($eval),
-                    'staff'   => $eval->checkin && $eval->checkin->staff ? $eval->checkin->staff->staff_name : 'ไม่ระบุ',
-                    'rating'  => (int) $eval->rating,
-                    'comment' => (string) ($eval->comment ?? ''),
-                ];
-            });
-            // ===== [จบ ข้อ 15: เตรียมข้อมูล] =====
-
-            if ($request->export_type === 'pdf') {
-                return $this->exportPDF($rows, $startDate, $endDate);
-            } else {
-                return $this->exportExcel($rows);
-            }
-        });
-    }
-
-    // [แก้ไข ระดับ 3 ข้อ 15] รับ $rows ที่เตรียมไว้แล้ว แทน $evaluations
-    private function exportPDF($rows, $startDate, $endDate)
-    {
-        $dateLabel = ($startDate && $endDate) 
-            ? $startDate->format('d/m/Y') . ' - ' . $endDate->format('d/m/Y') 
-            : 'ทั้งหมด';
-
-        // [แก้ไข ระดับ 3 ข้อ 15] กำหนดขนาดกระดาษ A4 ชัดเจน (ฟอนต์ไทยตั้งค่าไว้ใน export_pdf_template)
-        $pdf = Pdf::loadView('report.export_pdf_template', compact('rows', 'dateLabel'))
-            ->setPaper('a4', 'portrait');
-        return $pdf->download('report_' . date('Ymd_His') . '.pdf');
-    }
-
-    // [แก้ไข ระดับ 3 ข้อ 15] รับ $rows ที่เตรียมไว้แล้ว แทน $evaluations
-    private function exportExcel($rows)
-    {
-        $fileName = 'report_' . date('Ymd_His') . '.csv';
-        $headers = [
-            "Content-type"        => "text/csv; charset=UTF-8",
-            "Content-Disposition" => "attachment; filename=$fileName",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
-        ];
-
-        $callback = function () use ($rows) {
-            $file = fopen('php://output', 'w');
-            fputs($file, "\xEF\xBB\xBF");
-            
-            fputcsv($file, ['วันที่', 'เวลา', 'เคาน์เตอร์', 'รายชื่อ', 'คะแนน', 'ความคิดเห็น']);
-
-            foreach ($rows as $row) {
-                // [เพิ่มเติม ระดับ 3] กัน CSV Injection ทุกช่องที่เป็นข้อความ
-                fputcsv($file, [
-                    $row['date'],
-                    $row['time'],
-                    $this->csvSafe($row['counter']),
-                    $this->csvSafe($row['staff']),
-                    $row['rating'],
-                    $this->csvSafe($row['comment']),
-                ]);
-            }
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
-    }
-
-    // ===== [เพิ่มใหม่ ระดับ 3 ข้อ 15] ชื่อเคาน์เตอร์ที่อ่านเข้าใจได้ =====
-    // ผลลัพธ์ เช่น "เคาน์เตอร์ 8 — บริการเคาน์เตอร์ชั้น 6"
-    private function counterLabel($eval): string
-    {
-        $schedule = $eval->checkin?->schedule;
-        if (!$schedule) {
-            return 'ไม่ระบุ';
+        // ----- ช่วงเวลา (เวลาไทย) -----
+        $now = CheckinService::now();
+        switch ($validated['time_range']) {
+            case 'today':
+                $start = $now->copy()->startOfDay();
+                $end = $now->copy()->endOfDay();
+                break;
+            case 'week':
+                $start = $now->copy()->startOfWeek();
+                $end = $now->copy()->endOfWeek();
+                break;
+            case 'month':
+                $start = $now->copy()->startOfMonth();
+                $end = $now->copy()->endOfMonth();
+                break;
+            default: // custom
+                $start = Carbon::parse($validated['start_date'], CheckinService::TZ)->startOfDay();
+                $end = Carbon::parse($validated['end_date'], CheckinService::TZ)->endOfDay();
+                if ($start->diffInDays($end, true) > self::MAX_CUSTOM_DAYS) {
+                    return back()->withErrors(['ช่วงเวลาที่กำหนดเองต้องไม่เกิน ' . self::MAX_CUSTOM_DAYS . ' วัน'])->withInput();
+                }
         }
 
-        $counter = $schedule->counterSub?->counter;
-        if (!$counter) {
-            return 'จุดบริการ ID ' . $schedule->counter_sub_id;
+        // ----- เคาน์เตอร์ -----
+        $counterIds = [];
+        if (!$request->boolean('select_all')) {
+            $counterIds = array_values(array_unique(array_map('intval', $validated['counters'] ?? [])));
+            if (empty($counterIds)) {
+                return back()->withErrors(['กรุณาเลือกเคาน์เตอร์อย่างน้อย 1 เคาน์เตอร์ หรือเลือก "ทั้งหมด"'])->withInput();
+            }
         }
 
-        // [แก้ไข ระดับ 4] ใช้รหัสจุดย่อยรูปแบบกลาง เช่น "เคาน์เตอร์ 8.1 — บริการเคาน์เตอร์ชั้น 6"
-        // เดิม [ระดับ 3 ข้อ 15]: 'เคาน์เตอร์ ' . $counter->counter_id . ' — ' . location (ไม่บอกว่าจุดย่อยไหน)
-        return CounterSub::labelFor($schedule->counter_sub_id) . ' — ' . $counter->counter_location;
-    }
-    // ===== [จบ ข้อ 15: counterLabel] =====
+        $report = (new EvaluationReportService($start, $end, $counterIds))->build();
+        $rangeLabel = $this->rangeLabel($start, $end);
+        $fileBase = 'report_' . $now->format('Ymd_His');
 
-    // ===== [เพิ่มใหม่ ระดับ 3 — แก้เพิ่มจากที่หลุดในระดับ 1] กัน CSV Injection =====
-    // ความคิดเห็นมาจากผู้รับบริการที่ไม่ต้องล็อกอิน ถ้าขึ้นต้นด้วย = + - @ เมื่อเปิดใน Excel จะถูกตีความเป็นสูตรและทำงานทันที
-    // เติม ' นำหน้า เพื่อให้ Excel แสดงเป็นข้อความธรรมดา
-    private function csvSafe($value): string
-    {
-        $value = (string) ($value ?? '');
-        return preg_match('/^[=+\-@\t\r]/u', $value) ? "'" . $value : $value;
+        if ($validated['export_type'] === 'pdf') {
+            // ===== [แก้ PDF] ตรวจฟอนต์ภาษาไทยก่อนสร้าง PDF =====
+            // เดิม: ถ้าไม่มีฟอนต์ DomPDF จะใช้ฟอนต์ตั้งต้นที่ไม่มีอักษรไทย แล้วได้ไฟล์ที่ภาษาไทยเป็น ??? ทั้งหมด
+            //       โดยไม่บอกสาเหตุ — ตอนนี้แจ้งชัดเจนว่าขาดอะไร
+            $fontProblem = $this->thaiFontProblem();
+            if ($fontProblem !== null) {
+                return back()->withErrors([$fontProblem])->withInput();
+            }
+
+            // ระบุตำแหน่งฟอนต์และขอบเขตไฟล์ที่ DomPDF อ่านได้ให้ชัดเจน (ไม่พึ่งค่าตั้งต้นของไลบรารี)
+            Pdf::setOption([
+                'fontDir'     => storage_path('fonts'),
+                'fontCache'   => storage_path('fonts'),
+                'chroot'      => base_path(),
+                'defaultFont' => 'THSarabunNew',
+            ]);
+            // ===== [จบ แก้ PDF: ตรวจฟอนต์] =====
+
+            return Pdf::loadView('report.export_pdf_template', [
+                'report'     => $report,
+                'rangeLabel' => $rangeLabel,
+            ])
+                // [รายงาน+Online ข้อ 2] แนวนอน เพื่อให้คอลัมน์เคาน์เตอร์หลายช่องพอดีหน้า
+                ->setPaper('a4', 'landscape')
+                ->download($fileBase . '.pdf');
+        }
+
+        // ----- Excel (.xlsx) -----
+        if (!EvaluationExcelExporter::isAvailable()) {
+            return back()->withErrors(['ระบบยังไม่ได้ติดตั้งส่วนสร้างไฟล์ Excel (phpoffice/phpspreadsheet) — กรุณาแจ้งผู้ดูแลระบบ'])->withInput();
+        }
+
+        // เรียงรูปแบบตามลำดับมาตรฐาน และตัดค่าซ้ำ
+        $modes = array_values(array_intersect(EvaluationExcelExporter::MODES, $validated['excel_modes'] ?? []));
+
+        return (new EvaluationExcelExporter())->download($report, $modes, $fileBase . '.xlsx', $rangeLabel);
     }
-    // ===== [จบ CSV Injection] =====
+
+    /**
+     * [แก้ PDF] ตรวจความพร้อมของฟอนต์ภาษาไทย คืนข้อความปัญหา (หรือ null ถ้าพร้อม)
+     */
+    private function thaiFontProblem(): ?string
+    {
+        $dir = storage_path('fonts');
+        $missing = [];
+        foreach (['THSarabunNew.ttf', 'THSarabunNew-Bold.ttf'] as $file) {
+            $path = $dir . DIRECTORY_SEPARATOR . $file;
+            // ไฟล์ต้องมีอยู่ และต้องเป็นไฟล์ฟอนต์จริง (กันกรณีดาวน์โหลดได้หน้าเว็บ HTML หรือไฟล์ว่าง)
+            if (!is_file($path) || filesize($path) < 10240) {
+                $missing[] = $file;
+            }
+        }
+
+        if (!empty($missing)) {
+            return 'ยังไม่พบไฟล์ฟอนต์ภาษาไทย: ' . implode(', ', $missing)
+                . ' ในโฟลเดอร์ storage/fonts (ชื่อไฟล์ต้องตรงทุกตัวอักษร) — PDF จึงยังแสดงภาษาไทยไม่ได้';
+        }
+        if (!is_writable($dir)) {
+            return 'ระบบเขียนโฟลเดอร์ storage/fonts ไม่ได้ (DomPDF ต้องสร้างไฟล์ cache ของฟอนต์) — กรุณาตั้งสิทธิ์ให้ www-data';
+        }
+        return null;
+    }
+
+    /** เช่น "1/10/2569 – 31/10/2569" หรือ "31/10/2569" */
+    private function rangeLabel(Carbon $start, Carbon $end): string
+    {
+        $format = fn (Carbon $d) => $d->format('j/n/') . ($d->year + 543);
+        return $start->isSameDay($end) ? $format($start) : $format($start) . ' – ' . $format($end);
+    }
 }

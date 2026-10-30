@@ -8,6 +8,25 @@
     {{-- [แก้ไข ระดับ 3 ข้อ 17] เพิ่ม ?v= ให้แท็บเล็ตโหลด CSS ใหม่ทุกครั้งที่ไฟล์เปลี่ยน
          เดิม: <link rel="stylesheet" href="{{ asset('css/checkin.css') }}"> (แท็บเล็ตอาจค้าง CSS เก่าใน cache) --}}
     <link rel="stylesheet" href="{{ asset('css/checkin.css') }}?v={{ filemtime(public_path('css/checkin.css')) }}">
+    {{-- [รายงาน+Online ข้อ 1] สไตล์ของคำชี้แจงในรายการรีวิว --}}
+    <style>
+        .review-note { margin-top: 10px; padding: 10px 12px; background: #ebf8ff; border-left: 3px solid #3182ce; border-radius: 8px; }
+        .review-note-label { font-size: 11px; font-weight: 700; color: #2b6cb0; margin-bottom: 4px; }
+        .review-note-text { font-size: 13px; color: #2d3748; white-space: pre-wrap; word-break: break-word; }
+        .note-open-btn { margin-top: 10px; background: #fff; border: 1px dashed #a0aec0; color: #4a5568; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .note-open-btn:hover { border-color: #3182ce; color: #2b6cb0; }
+        .note-editor { margin-top: 10px; }
+        .note-input { width: 100%; min-height: 80px; padding: 10px; border: 1.5px solid #cbd5e0; border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+        .note-input:focus { outline: none; border-color: #3182ce; }
+        .note-hint { display: flex; justify-content: space-between; font-size: 11px; color: #a0aec0; margin-top: 4px; }
+        .note-hint strong { color: #c53030; }
+        .note-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+        .note-actions button { padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .note-cancel { background: #fff; border: 1px solid #cbd5e0; color: #4a5568; }
+        .note-save { background: #3182ce; border: 1px solid #3182ce; color: #fff; }
+        .note-save:disabled { opacity: 0.6; cursor: wait; }
+        .note-error { margin-top: 6px; font-size: 12px; color: #c53030; font-weight: 600; }
+    </style>
 </head>
 <body>
 
@@ -283,6 +302,33 @@
                             <?php echo $i <= $review->rating ? '★' : '☆'; ?>
                         <?php endfor; ?>
                     </div>
+
+                    {{-- ===== [รายงาน+Online ข้อ 1] คำชี้แจงจากผู้ให้บริการ =====
+                         มีแล้ว → แสดงแบบอ่านอย่างเดียว (ไม่มีปุ่มแก้ไข)
+                         ยังไม่มี → ปุ่ม "เขียนคำชี้แจง" (บันทึกได้ครั้งเดียว) --}}
+                    @if(!empty($review->note))
+                        <div class="review-note">
+                            <div class="review-note-label">คำชี้แจงของฉัน · {{ $review->note_time }} น.</div>
+                            <div class="review-note-text">{{ $review->note }}</div>
+                        </div>
+                    @else
+                        <div class="note-block" data-evaluation-id="{{ $review->id }}">
+                            <button type="button" class="note-open-btn" onclick="openNoteEditor(this)">✎ เขียนคำชี้แจง</button>
+                            <div class="note-editor" hidden>
+                                <textarea class="note-input" maxlength="{{ \App\Models\Evaluation::NOTE_MAX_LENGTH }}" placeholder="อธิบายสถานการณ์ เช่น ผู้ประเมินเข้าใจผิดเรื่องอะไร (บันทึกแล้วแก้ไขไม่ได้)" oninput="updateNoteCount(this)"></textarea>
+                                <div class="note-hint">
+                                    <strong>บันทึกแล้วแก้ไขหรือลบไม่ได้</strong>
+                                    <span class="note-count">0/{{ \App\Models\Evaluation::NOTE_MAX_LENGTH }}</span>
+                                </div>
+                                <div class="note-actions">
+                                    <button type="button" class="note-cancel" onclick="closeNoteEditor(this)">ยกเลิก</button>
+                                    <button type="button" class="note-save" onclick="saveNote(this)">บันทึก</button>
+                                </div>
+                                <div class="note-error" hidden></div>
+                            </div>
+                        </div>
+                    @endif
+                    {{-- ===== [จบ ข้อ 1: คำชี้แจง] ===== --}}
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -381,6 +427,89 @@
         const statusUrl = "{{ route('checkin.status') }}";
         const homeUrl = "{{ route('checkin.index') }}";
 
+        // ===== [รายงาน+Online ข้อ 1] เขียนคำชี้แจง =====
+        const noteUrl = "{{ route('checkin.evaluationNote') }}";
+        const noteCsrf = "{{ csrf_token() }}";
+        const NOTE_MAX = {{ \App\Models\Evaluation::NOTE_MAX_LENGTH }};
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        }
+
+        window.openNoteEditor = function (btn) {
+            const block = btn.closest('.note-block');
+            btn.hidden = true;
+            const editor = block.querySelector('.note-editor');
+            editor.hidden = false;
+            editor.querySelector('.note-input').focus();
+        };
+
+        window.closeNoteEditor = function (btn) {
+            const block = btn.closest('.note-block');
+            const input = block.querySelector('.note-input');
+            if (input.value.trim() !== '' && !confirm('ยกเลิกคำชี้แจงที่พิมพ์ไว้?')) return;
+            input.value = '';
+            updateNoteCount(input);
+            block.querySelector('.note-error').hidden = true;
+            block.querySelector('.note-editor').hidden = true;
+            block.querySelector('.note-open-btn').hidden = false;
+        };
+
+        window.updateNoteCount = function (input) {
+            const counter = input.closest('.note-editor').querySelector('.note-count');
+            counter.innerText = input.value.length + '/' + NOTE_MAX;
+        };
+
+        window.saveNote = function (btn) {
+            const block = btn.closest('.note-block');
+            const input = block.querySelector('.note-input');
+            const errorBox = block.querySelector('.note-error');
+            const note = input.value.trim();
+
+            errorBox.hidden = true;
+            if (note === '') {
+                errorBox.innerText = 'กรุณาพิมพ์คำชี้แจง';
+                errorBox.hidden = false;
+                return;
+            }
+            if (!confirm('ยืนยันบันทึกคำชี้แจง?\nเมื่อบันทึกแล้วจะแก้ไขหรือลบไม่ได้')) return;
+
+            btn.disabled = true;
+            btn.innerText = 'กำลังบันทึก...';
+
+            fetch(noteUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': noteCsrf,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ evaluation_id: block.dataset.evaluationId, note: note })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 419) throw new Error('หมดเวลาการใช้งาน กรุณาโหลดหน้านี้ใหม่');
+                if (!res.ok) throw new Error(data.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+                return data;
+            })
+            .then(data => {
+                // แทนที่ช่องเขียนด้วยคำชี้แจงแบบอ่านอย่างเดียว
+                const wrapper = document.createElement('div');
+                wrapper.className = 'review-note';
+                wrapper.innerHTML = '<div class="review-note-label">คำชี้แจงของฉัน · ' + escapeHtml(data.note_time) + ' น.</div>'
+                    + '<div class="review-note-text">' + escapeHtml(data.note) + '</div>';
+                block.replaceWith(wrapper);
+            })
+            .catch(err => {
+                errorBox.innerText = err.message;
+                errorBox.hidden = false;
+                btn.disabled = false;
+                btn.innerText = 'บันทึก';
+            });
+        };
+        // ===== [จบ ข้อ 1: เขียนคำชี้แจง] =====
+
         function readText(id) {
             const el = document.getElementById(id);
             return el ? el.innerText.trim() : '';
@@ -443,7 +572,10 @@
                 // 3. อัปเดตกล่องคอมเมนต์ด้านล่าง
                 let newList = doc.getElementById('review-list-container');
                 let curList = document.getElementById('review-list-container');
-                if (newList && curList) {
+                // [รายงาน+Online ข้อ 1] ถ้ากำลังเขียนคำชี้แจงอยู่ ไม่แทนที่รายการ (ไม่งั้นข้อความที่พิมพ์ไว้จะหาย)
+                // ตัวเลขสถิติด้านบนยังอัปเดตตามปกติ รายการจะอัปเดตในรอบถัดไปหลังปิดช่องเขียน
+                const isWritingNote = curList && Array.from(curList.querySelectorAll('.note-editor')).some(ed => !ed.hidden);
+                if (newList && curList && !isWritingNote) {
                     curList.innerHTML = newList.innerHTML;
                     filterReviews(currentFilter); // ให้ค้างแท็บเดิมและคงสีปุ่มที่พนักงานกำลังกดดูอยู่
                 }

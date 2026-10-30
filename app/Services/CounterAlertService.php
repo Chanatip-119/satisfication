@@ -52,6 +52,8 @@ class CounterAlertService
             ->whereNotNull('staff_id')
             ->whereNotNull('counter_sub_id')
             ->where('status', '!=', 'close')
+            // [รายงาน+Online ข้อ 4] ไม่ตรวจเคาน์เตอร์ Online (ไม่มีคนนั่งโดยตั้งใจ จึงไม่ใช่ "เคาน์เตอร์ว่าง")
+            ->whereHas('counterSub.counter', fn ($q) => $q->where('is_online', false))
             ->orderBy('start_time')
             ->get();
 

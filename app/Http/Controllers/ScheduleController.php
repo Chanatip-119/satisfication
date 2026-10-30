@@ -37,7 +37,10 @@ class ScheduleController extends Controller
                   ->whereBetween('schedule_date', [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')])
                   ->orderBy('start_time', 'asc')
                   ->orderBy('schedule_id', 'asc'); 
-        }])->where('is_active', true)->get();
+        }])->where('is_active', true)
+           // [รายงาน+Online ข้อ 4] ไม่แสดงเคาน์เตอร์ Online ในตาราง (ไม่ต้องจัดกะ ไม่มีคน Check-in)
+           ->where('is_online', false)
+           ->get();
 
         // ตรวจสอบเคาน์เตอร์เดี่ยว (เช่น 4, 5 หรือเคาน์เตอร์ที่ยังไม่มีจุดย่อย) ให้มี CounterSub เริ่มต้นเสมอ
         foreach ($counters as $c) {
@@ -96,6 +99,11 @@ class ScheduleController extends Controller
             'status'         => 'nullable|string',
             'work_days'      => 'nullable|array',
         ]);
+
+        // [รายงาน+Online ข้อ 4] จัดกะบนเคาน์เตอร์ Online ไม่ได้ (กันกรณีส่ง counter_sub_id มาเอง)
+        if ($request->filled('counter_sub_id') && $this->isOnlineCounterSub((int) $request->counter_sub_id)) {
+            return redirect()->back()->withErrors(['เคาน์เตอร์ Online ไม่ต้องจัดกะ — รับประเมินได้ตลอดโดยไม่ต้องมีคน Check-in']);
+        }
 
         $startDate = Carbon::parse($request->schedule_date);
         $endDate = $request->end_date ? Carbon::parse($request->end_date) : $startDate->copy();
@@ -207,6 +215,14 @@ class ScheduleController extends Controller
         });
     }
 
+    // [รายงาน+Online ข้อ 4] จุดย่อยนี้เป็นของเคาน์เตอร์ Online หรือไม่
+    private function isOnlineCounterSub(int $counterSubId): bool
+    {
+        return \App\Models\CounterSub::where('counter_sub_id', $counterSubId)
+            ->whereHas('counter', fn ($q) => $q->where('is_online', true))
+            ->exists();
+    }
+
     // ===== [Check-in ฟีเจอร์ใหม่ ข้อ 3/4] หัวหน้าบังคับ Check-out =====
     // ใช้เมื่อพนักงานลืม Check-out แล้วเครื่องเดิมใช้ไม่ได้ (เช่น ปิดเบราว์เซอร์ไปแล้ว) จนถูกบล็อกไม่ให้ Check-in จุดอื่น (ข้อ 4)
     // หรือต่อเวลาแล้วลืม Check-out (ระบบไม่ Check-out ให้อัตโนมัติ)
@@ -274,7 +290,9 @@ class ScheduleController extends Controller
         $errors = [];
 
         // ดึงรายชื่อ counter_sub_id และ staff_id ที่มีอยู่จริงในระบบ
-        $validCounterSubIds = \App\Models\CounterSub::pluck('counter_sub_id')->toArray();
+        // [รายงาน+Online ข้อ 4] ไม่รับจุดย่อยของเคาน์เตอร์ Online ในไฟล์ Import (แถวนั้นจะถูกข้ามพร้อมแจ้งเหตุผล)
+        $validCounterSubIds = \App\Models\CounterSub::whereHas('counter', fn ($q) => $q->where('is_online', false))
+            ->pluck('counter_sub_id')->toArray();
         $validStaffIds = Staff::pluck('staff_id')->toArray();
 
         return DB::transaction(function () use ($rows, &$imported, &$skipped, &$errors, $validCounterSubIds, $validStaffIds) {

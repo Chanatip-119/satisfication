@@ -32,6 +32,9 @@ td { padding: 15px 10px; border-bottom: 1px solid #edf2f7; vertical-align: middl
 .status-badge.active .dot { width: 6px; height: 6px; background-color: #008000; border-radius: 50%; }
 .status-badge.close { background-color: #f0f0f0; color: #718096; }
 .status-badge.close .dot { width: 6px; height: 6px; background-color: #718096; border-radius: 50%; }
+/* [รายงาน+Online ข้อ 4] เคาน์เตอร์ Online */
+.status-badge.online { background-color: #ebf8ff; color: #2b6cb0; }
+.status-badge.online .dot { width: 6px; height: 6px; background-color: #3182ce; border-radius: 50%; }
 
 .btn-outline { padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-weight: 600; color: #4a5568; background: white; cursor: pointer; transition: 0.2s; }
 .btn-outline:hover { border-color: #cbd5e0; background: #f7fafc; }

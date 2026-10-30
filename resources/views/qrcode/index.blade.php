@@ -85,6 +85,10 @@
                     $isActive = $sub->is_active && $sub->counter && $sub->counter->is_active;
                     $locationText = $sub->counter ? $sub->counter->counter_location : '';
                     $displaySubtitle = $locationText;
+                    // [รายงาน+Online ข้อ 4] บอกให้รู้ว่าเป็นจุดประเมิน Online (ลิงก์นี้ใช้ส่งให้ผู้รับบริการได้ตลอด)
+                    if ($sub->counter && $sub->counter->is_online) {
+                        $displaySubtitle .= ' · ประเมิน Online ตลอด 24 ชม.';
+                    }
 
                     // [แก้ไข ระดับ 4] ชื่อเคาน์เตอร์รูปแบบเดียวกันทั้งระบบ (เช่น "เคาน์เตอร์ 8.1")
                     // เดิม: "เคาน์เตอร์ {{ $sub->counter_sub_id }}" เช่น "เคาน์เตอร์ 7" ซึ่งไม่ตรงกับชื่อในหน้าจัดการเคาน์เตอร์

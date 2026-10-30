@@ -92,7 +92,8 @@
                 <div class="section-block">
                     <h3>1. ประเภทไฟล์</h3>
                     <div class="file-type-container">
-                        <input type="radio" name="export_type" id="type_pdf" value="pdf" checked class="hidden-radio">
+                        {{-- [รายงาน+Online ข้อ 3] คืนค่าที่เลือกไว้เมื่อส่งไม่ผ่าน validation (old) --}}
+                        <input type="radio" name="export_type" id="type_pdf" value="pdf" {{ old('export_type', 'pdf') === 'pdf' ? 'checked' : '' }} class="hidden-radio" onchange="toggleExcelModes()">
                         <label for="type_pdf" class="file-card">
                             <div class="radio-circle"></div>
                             <div class="file-icon">
@@ -107,7 +108,7 @@
                             </div>
                         </label>
 
-                        <input type="radio" name="export_type" id="type_excel" value="excel" class="hidden-radio">
+                        <input type="radio" name="export_type" id="type_excel" value="excel" {{ old('export_type') === 'excel' ? 'checked' : '' }} class="hidden-radio" onchange="toggleExcelModes()">
                         <label for="type_excel" class="file-card">
                             <div class="radio-circle"></div>
                             <div class="file-icon">
@@ -120,11 +121,47 @@
                             </div>
                             <div class="file-info">
                                 {{-- [แก้ไข ระดับ 4] เดิม: "Excel Report" — ไฟล์ที่ได้จริงเป็น .csv (เปิดใน Excel ได้) --}}
-                                <h4>Excel Report (.csv)</h4>
+                                {{-- [รายงาน+Online ข้อ 3] เดิม: "Excel Report (.csv)" — ตอนนี้เป็นไฟล์ Excel จริง แยกชีตได้ --}}
+                                <h4>Excel Report (.xlsx)</h4>
                             </div>
                         </label>
                     </div>
                 </div>
+
+                {{-- ===== [รายงาน+Online ข้อ 3] รูปแบบรายงาน Excel (แสดงเมื่อเลือก Excel) ===== --}}
+                @php $oldModes = old('excel_modes', ['per_counter', 'overall', 'average']); @endphp
+                <div class="section-block" id="excel_modes_box" style="display: none;">
+                    <h3>รูปแบบรายงาน Excel <span style="font-weight: 400; font-size: 13px; color: #718096;">(เลือกได้หลายแบบ — แต่ละแบบเป็นชีตแยกในไฟล์เดียวกัน)</span></h3>
+                    @unless($excelAvailable)
+                        <div style="background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 13px;">
+                            ระบบยังไม่ได้ติดตั้งส่วนสร้างไฟล์ Excel (phpoffice/phpspreadsheet) — ส่งออก PDF ได้ตามปกติ
+                        </div>
+                    @endunless
+                    <div class="counter-grid">
+                        <label class="counter-card">
+                            <input type="checkbox" name="excel_modes[]" value="per_counter" class="counter-checkbox excel-mode" {{ in_array('per_counter', $oldModes) ? 'checked' : '' }}>
+                            <div class="counter-info">
+                                <h4>รายเคาน์เตอร์</h4>
+                                <p>1 ชีตต่อ 1 เคาน์เตอร์: รายละเอียด, การกระจายคะแนน, รอบ Check-in และรายการประเมิน</p>
+                            </div>
+                        </label>
+                        <label class="counter-card">
+                            <input type="checkbox" name="excel_modes[]" value="overall" class="counter-checkbox excel-mode" {{ in_array('overall', $oldModes) ? 'checked' : '' }}>
+                            <div class="counter-info">
+                                <h4>ภาพรวม</h4>
+                                <p>รายการประเมินทั้งหมด (พร้อมคำชี้แจง) และรอบ Check-in ทั้งหมดในชีตเดียว</p>
+                            </div>
+                        </label>
+                        <label class="counter-card">
+                            <input type="checkbox" name="excel_modes[]" value="average" class="counter-checkbox excel-mode" {{ in_array('average', $oldModes) ? 'checked' : '' }}>
+                            <div class="counter-info">
+                                <h4>ค่าเฉลี่ย</h4>
+                                <p>ตารางคะแนนเฉลี่ยรายบุคลากร × เคาน์เตอร์, รายวัน × เคาน์เตอร์ และรายละเอียดเคาน์เตอร์</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                {{-- ===== [จบ ข้อ 3: รูปแบบ Excel] ===== --}}
 
                 <!-- 2. ช่วงเวลา -->
                 <div class="section-block">
@@ -164,7 +201,12 @@
                             <label class="counter-card">
                                 <input type="checkbox" name="counters[]" value="{{ $counter->counter_id }}" class="counter-checkbox" checked>
                                 <div class="counter-info">
-                                    <h4>เคาน์เตอร์ {{ $counter->counter_id }}</h4>
+                                    <h4>
+                                        เคาน์เตอร์ {{ $counter->counter_id }}
+                                        {{-- [รายงาน+Online ข้อ 3] บอกประเภท/สถานะ เพราะตอนนี้แสดงเคาน์เตอร์ที่ปิดใช้งานด้วย --}}
+                                        @if($counter->is_online)<span style="font-size: 11px; color: #2b6cb0; background: #ebf8ff; padding: 1px 6px; border-radius: 8px;">Online</span>@endif
+                                        @unless($counter->is_active)<span style="font-size: 11px; color: #718096; background: #edf2f7; padding: 1px 6px; border-radius: 8px;">ปิดใช้งาน</span>@endunless
+                                    </h4>
                                     <p>{{ $counter->counter_location }}</p> 
                                 </div>
                             </label>
@@ -208,11 +250,12 @@
 
         function toggleSelectAll() {
             const selectAllChecked = document.getElementById('select_all').checked;
-            const checkboxes = document.querySelectorAll('.counter-checkbox');
+            // [รายงาน+Online ข้อ 3] ไม่รวมเช็กบ็อกซ์รูปแบบ Excel (ใช้คลาสหน้าตาเดียวกัน)
+            const checkboxes = document.querySelectorAll('.counter-checkbox:not(.excel-mode)');
             checkboxes.forEach(cb => cb.checked = selectAllChecked);
         }
 
-        document.querySelectorAll('.counter-checkbox').forEach(cb => {
+        document.querySelectorAll('.counter-checkbox:not(.excel-mode)').forEach(cb => { // [รายงาน+Online ข้อ 3]
             cb.addEventListener('change', function() {
                 if (!this.checked) {
                     document.getElementById('select_all').checked = false;
@@ -223,9 +266,22 @@
         // ===== [เพิ่มใหม่ ระดับ 4] ตรวจก่อนส่ง + กันกดซ้ำระหว่างรอสร้างไฟล์ =====
         // เดิม: ไม่ติ๊กเคาน์เตอร์เลยก็ส่งได้ (ได้ข้อมูลทุกเคาน์เตอร์โดยไม่ตั้งใจ)
         //       และการสร้าง PDF ใช้เวลาหลายวินาที ผู้ใช้มักกดซ้ำจนเซิร์ฟเวอร์สร้างไฟล์ซ้อนกัน
+        // [รายงาน+Online ข้อ 3] แสดงตัวเลือกรูปแบบ Excel เฉพาะตอนเลือก Excel
+        // ใช้ class "excel-mode" แยกจากเช็กบ็อกซ์เคาน์เตอร์ (ใช้หน้าตา counter-checkbox เดียวกัน)
+        function toggleExcelModes() {
+            const isExcel = document.getElementById('type_excel').checked;
+            document.getElementById('excel_modes_box').style.display = isExcel ? 'block' : 'none';
+        }
+        toggleExcelModes();
+
         function handleExportSubmit() {
+            // [รายงาน+Online ข้อ 3] Excel ต้องเลือกรูปแบบอย่างน้อย 1 แบบ
+            if (document.getElementById('type_excel').checked && !document.querySelector('.excel-mode:checked')) {
+                alert('กรุณาเลือกรูปแบบรายงาน Excel อย่างน้อย 1 แบบ');
+                return false;
+            }
             const selectAll = document.getElementById('select_all').checked;
-            const anyCounter = document.querySelector('.counter-checkbox:checked');
+            const anyCounter = document.querySelector('.counter-checkbox:not(.excel-mode):checked'); // [รายงาน+Online ข้อ 3]
             if (!selectAll && !anyCounter) {
                 alert('กรุณาเลือกเคาน์เตอร์อย่างน้อย 1 เคาน์เตอร์ หรือกด "เลือกทั้งหมด"');
                 return false;

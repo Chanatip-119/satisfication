@@ -790,6 +790,8 @@
                                 </div>
                                 <div class="sp-card-desc" style="color:#1a202c; font-weight:500; font-size:13px;">${escapeHtml(c.text || 'ไม่มีข้อความ')}</div>
                                 <div class="star-rating" style="color:#d69e2e; font-size:12px; margin-top:4px;">${stars}</div>
+                                <!-- [รายงาน+Online ข้อ 1] คำชี้แจงจากผู้ให้บริการ (escape แล้ว) -->
+                                ${c.note ? `<div style="margin-top:8px; padding:8px 10px; background:#ebf8ff; border-left:3px solid #3182ce; border-radius:6px; font-size:12px; color:#2d3748;"><div style="font-weight:700; color:#2b6cb0; margin-bottom:2px;">คำชี้แจงจากผู้ให้บริการ · ${escapeHtml(c.note_time || '')} น.</div><div style="white-space:pre-wrap;">${escapeHtml(c.note)}</div></div>` : ''}
                             </div>`;
                     });
                 }

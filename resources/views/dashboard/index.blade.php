@@ -365,6 +365,12 @@
                                 </span>
                             </div>
                             <div class="comment-text">{{ $cmt['comment'] }}</div>
+                            {{-- [รายงาน+Online ข้อ 1] คำชี้แจงจากผู้ให้บริการ --}}
+                            @if(!empty($cmt['note']))
+                                <div class="comment-note">
+                                    <span class="comment-note-label">คำชี้แจงจากผู้ให้บริการ:</span> {{ $cmt['note'] }}
+                                </div>
+                            @endif
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>

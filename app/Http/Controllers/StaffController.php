@@ -172,14 +172,20 @@ class StaffController extends Controller
             ];
         });
 
-        $comments = $evaluations->whereNotNull('comment')->where('comment', '!=', '')->take(10)->map(function($e) use ($checkins, $counterLabel) {
+        // [รายงาน+Online ข้อ 1] รวมการประเมินที่มีคำชี้แจงด้วย แม้ผู้ประเมินไม่ได้เขียนความคิดเห็น (ให้คะแนนอย่างเดียว)
+        // เดิม: เฉพาะรายการที่มี comment
+        $comments = $evaluations->filter(fn ($e) => trim((string) $e->comment) !== '' || trim((string) $e->staff_note) !== '')
+            ->take(10)->map(function($e) use ($checkins, $counterLabel) {
             $c = $checkins->where('checkin_id', $e->checkin_id)->first();
             return [
                 // [แก้ไข ระดับ 3 ข้อ 16] เดิม: 'เคาน์เตอร์ 1.' . $c->schedule->counter_sub_id
                 'counter' => $c ? $counterLabel($c->schedule) : 'ไม่ระบุ',
                 'time' => Carbon::parse($e->evaluation_at)->format('H:i น.'),
                 'text' => $e->comment,
-                'rating' => $e->rating
+                'rating' => $e->rating,
+                // [รายงาน+Online ข้อ 1] คำชี้แจงจากผู้ให้บริการ
+                'note' => $e->staff_note,
+                'note_time' => $e->staff_note_at ? Carbon::parse($e->staff_note_at)->translatedFormat('j M. H:i') : null,
             ];
         });
 

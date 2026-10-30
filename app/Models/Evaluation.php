@@ -13,13 +13,25 @@ class Evaluation extends Model
     protected $fillable = [
         'rating',
         'comment',
-        'checkin_id'
+        'checkin_id',
+        'counter_sub_id', // [รายงาน+Online ข้อ 4] จุดที่ถูกประเมิน (การประเมิน Online ไม่มี checkin_id)
     ];
+    // [รายงาน+Online ข้อ 1] staff_note / staff_note_at / staff_note_by ตั้งใจไม่ใส่ใน $fillable
+    // บันทึกได้ทางเดียวคือ CheckinController::saveEvaluationNote() ซึ่งกันการเขียนทับไว้แล้ว
+
+    /** [รายงาน+Online ข้อ 1] ความยาวสูงสุดของคำชี้แจง */
+    public const NOTE_MAX_LENGTH = 500;
 
     // เปิดใช้งานความสัมพันธ์เชื่อมกลับไปยัง Checkin เพื่อแก้ไขปัญหา BadMethodCallException
     public function checkin()
     {
         return $this->belongsTo(Checkin::class, 'checkin_id', 'checkin_id');
+    }
+
+    // [รายงาน+Online ข้อ 4] จุดย่อยที่ถูกประเมิน (มีทั้งการประเมินปกติและ Online)
+    public function counterSub()
+    {
+        return $this->belongsTo(CounterSub::class, 'counter_sub_id', 'counter_sub_id');
     }
 
     public function getRouteKeyName()

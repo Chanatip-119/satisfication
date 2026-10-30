@@ -86,7 +86,10 @@ class CheckinController extends Controller
             $rawArray = method_exists($eval, 'toArray') ? $eval->toArray() : json_decode(json_encode($eval), true);
             $evalDateRaw = null;
             
-            foreach (['created_at', 'updated_at', 'timestamp', 'evaluation_time', 'eval_time', 'evaluation_date', 'date', 'time'] as $col) {
+            // [รายงาน+Online ข้อ 1] ใส่ evaluation_at ไว้ลำดับแรก (คอลัมน์เวลาประเมินจริงของตารางนี้)
+            // เดิมไม่มีในรายการ ระบบไปเจอผ่านการสแกนหาคอลัมน์ที่มีรูปแบบวันที่แทน
+            // ซึ่งหลังเพิ่มคอลัมน์ staff_note_at อาจหยิบผิดคอลัมน์ได้
+            foreach (['evaluation_at', 'created_at', 'updated_at', 'timestamp', 'evaluation_time', 'eval_time', 'evaluation_date', 'date', 'time'] as $col) {
                 if (!empty($rawArray[$col])) {
                     $evalDateRaw = $rawArray[$col];
                     break;
@@ -95,7 +98,7 @@ class CheckinController extends Controller
             
             if (!$evalDateRaw) {
                 foreach ($rawArray as $key => $val) {
-                    if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/', $val) && !in_array($key, ['checkin_at', 'checkout_at'])) {
+                    if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/', $val) && !in_array($key, ['checkin_at', 'checkout_at', 'staff_note_at'])) {
                         $evalDateRaw = $val;
                         break;
                     }
@@ -105,10 +108,14 @@ class CheckinController extends Controller
             $resolvedDate = $evalDateRaw ? Carbon::parse($evalDateRaw) : Carbon::parse($checkinFallbackTime);
 
             return (object)[
-                'date'    => $resolvedDate->translatedFormat('j M.'),
-                'time'    => $resolvedDate->format('H:i'),
-                'rating'  => (int) $eval->rating,
-                'comment' => trim($eval->comment) !== '' ? trim($eval->comment) : 'ไม่มีข้อเสนอแนะ'
+                'id'        => (int) $eval->evaluation_id, // [รายงาน+Online ข้อ 1] ใช้อ้างอิงตอนเขียนคำชี้แจง
+                'date'      => $resolvedDate->translatedFormat('j M.'),
+                'time'      => $resolvedDate->format('H:i'),
+                'rating'    => (int) $eval->rating,
+                'comment'   => trim((string) $eval->comment) !== '' ? trim($eval->comment) : 'ไม่มีข้อเสนอแนะ',
+                // [รายงาน+Online ข้อ 1] คำชี้แจงที่เขียนไว้แล้ว (ถ้ามี จะแสดงแบบอ่านอย่างเดียว)
+                'note'      => $eval->staff_note,
+                'note_time' => $eval->staff_note_at ? CheckinService::parse($eval->staff_note_at)->translatedFormat('j M. H:i') : null,
             ];
         });
 
@@ -171,7 +178,8 @@ class CheckinController extends Controller
         }
 
         $countersList = collect();
-        $counters = Counter::with('countersubs')->where('is_active', true)->get();
+        // [รายงาน+Online ข้อ 4] ไม่แสดงเคาน์เตอร์ Online — เคาน์เตอร์ประเภทนี้ไม่ต้องมีคน Check-in
+        $counters = Counter::with('countersubs')->where('is_active', true)->where('is_online', false)->get();
 
         foreach ($counters as $counter) {
             foreach ($counter->countersubs as $sub) {
@@ -248,7 +256,8 @@ class CheckinController extends Controller
         $counterSub = CounterSub::with('counter')
             ->where('counter_sub_id', $request->counter_id)
             ->where('is_active', true)
-            ->whereHas('counter', fn ($query) => $query->where('is_active', true))
+            // [รายงาน+Online ข้อ 4] Check-in เคาน์เตอร์ Online ไม่ได้ (กันกรณีส่ง counter_id มาเอง)
+            ->whereHas('counter', fn ($query) => $query->where('is_active', true)->where('is_online', false))
             ->first();
 
         if (!$counterSub) {
@@ -667,6 +676,72 @@ class CheckinController extends Controller
         ]);
     }
     // ===== [จบ ข้อ 2: extend] =====
+
+    // ===== [รายงาน+Online ข้อ 1] บันทึกคำชี้แจงต่อการประเมิน (เขียนได้ครั้งเดียว แก้ไม่ได้) =====
+    // เงื่อนไขความปลอดภัย:
+    //   1. ต้องมี Check-in ที่ยังเปิดอยู่ของเครื่องนี้ (kiosk_checkin_id ใน session) — คนนอกเรียกตรง ๆ ไม่ได้
+    //   2. การประเมินต้องเป็นของ "บุคลากรคนเดียวกับที่ Check-in อยู่" — เขียนชี้แจงแทนคนอื่นไม่ได้
+    //   3. บันทึกด้วยเงื่อนไข WHERE staff_note IS NULL ในคำสั่งเดียว — กดซ้ำ/ส่งพร้อมกัน/ยิง API เองก็เขียนทับไม่ได้
+    //   4. จำกัด 30 ครั้งต่อ 10 นาทีต่อ session กันการยิงรัว
+    // ตอบกลับเป็น JSON เพื่อให้หน้าเว็บอัปเดตรายการได้ทันทีโดยไม่ต้องโหลดหน้าใหม่
+    public function saveEvaluationNote(Request $request)
+    {
+        $throttleKey = 'evaluation-note:' . $request->session()->getId();
+        if (RateLimiter::tooManyAttempts($throttleKey, 30)) {
+            return response()->json(['message' => 'บันทึกบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่'], 429);
+        }
+        RateLimiter::hit($throttleKey, 600);
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'evaluation_id' => 'required|integer',
+            'note'          => 'required|string|max:' . Evaluation::NOTE_MAX_LENGTH,
+        ], [
+            'note.required' => 'กรุณาพิมพ์คำชี้แจง',
+            'note.max'      => 'คำชี้แจงต้องไม่เกิน ' . Evaluation::NOTE_MAX_LENGTH . ' ตัวอักษร',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        // ตัดช่องว่างหัวท้าย และยุบบรรทัดว่างที่ติดกันเกิน 2 บรรทัด
+        $note = trim(preg_replace("/(\R){3,}/u", "\n\n", (string) $request->note));
+        if ($note === '') {
+            return response()->json(['message' => 'กรุณาพิมพ์คำชี้แจง'], 422);
+        }
+
+        $kioskCheckinId = (int) $request->session()->get('kiosk_checkin_id', 0);
+        $activeCheckin = $kioskCheckinId > 0
+            ? Checkin::where('checkin_id', $kioskCheckinId)->whereNull('checkout_at')->first()
+            : null;
+        if (!$activeCheckin) {
+            return response()->json(['message' => 'กรุณา Check-in ก่อนเขียนคำชี้แจง'], 403);
+        }
+
+        $evaluation = Evaluation::with('checkin')->find((int) $request->evaluation_id);
+        if (!$evaluation || !$evaluation->checkin || (int) $evaluation->checkin->staff_id !== (int) $activeCheckin->staff_id) {
+            return response()->json(['message' => 'เขียนคำชี้แจงได้เฉพาะการประเมินของตัวเองเท่านั้น'], 403);
+        }
+
+        $now = CheckinService::now();
+        $updated = Evaluation::where('evaluation_id', $evaluation->evaluation_id)
+            ->whereNull('staff_note')
+            ->update([
+                'staff_note'    => $note,
+                'staff_note_at' => $now,
+                'staff_note_by' => (int) $activeCheckin->staff_id,
+            ]);
+
+        if ($updated === 0) {
+            return response()->json(['message' => 'การประเมินนี้มีคำชี้แจงแล้ว ไม่สามารถแก้ไขได้'], 409);
+        }
+
+        return response()->json([
+            'ok'        => true,
+            'note'      => $note,
+            'note_time' => $now->translatedFormat('j M. H:i'),
+        ]);
+    }
+    // ===== [จบ ข้อ 1: saveEvaluationNote] =====
 
     // [Check-in ฟีเจอร์ใหม่ ข้อ 4] ข้อความแจ้งว่า PIN นี้กำลังทำงานอยู่ที่เคาน์เตอร์ไหน
     private function activeElsewhereMessage(Checkin $checkin): string
